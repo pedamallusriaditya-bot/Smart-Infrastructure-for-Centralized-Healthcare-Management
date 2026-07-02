@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "module": "NodeNext",
+    "isolatedModules": true,
+    "moduleResolution": "NodeNext"
+  },
+  "include": ["tests/**/*", "src/**/*"]
+}
