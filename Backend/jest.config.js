@@ -1,7 +1,7 @@
 export default {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
-  setupFiles: ['dotenv/config'],
+  setupFilesAfterEnv: ["<rootDir>/tests/setup.ts"],
   moduleNameMapper: {
     // This regex catches imports ending in .js and maps them to the .ts source
     '^@/(.*)\\.js$': '<rootDir>/src/$1.ts',
