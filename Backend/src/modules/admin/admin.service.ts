@@ -1,120 +1,95 @@
 import { prisma } from '../../lib/prisma.js';
+import { UserStatus } from '@prisma/client';
+import { logger } from '../../lib/logger.js';
 
 export class AdminService {
-  async getSystemMetrics() {
-    const totalUsers =
-      await prisma.user.count();
+  /**
+   * Optimized Aggregations for the Admin Dashboard
+   */
+  async getSystemMetrics(requestId: string) {
+    const [userCounts, patientCount, doctorCount, appointmentCount] = await Promise.all([
+      prisma.user.count(),
+      prisma.patient.count(),
+      prisma.doctor.count(),
+      prisma.appointment.count()
+    ]);
 
-    const totalPatients =
-      await prisma.patient.count();
+    // Efficiently get distribution without fetching full user objects
+    const roleStats = await prisma.role.findMany({
+      select: {
+        name: true,
+        _count: { select: { users: true } }
+      }
+    });
 
-    const totalDoctors =
-      await prisma.doctor.count();
-
-    const roles =
-      await prisma.role.findMany({
-        select: {
-          name: true,
-          users: {
-            select: {
-              id: true
-            }
-          }
-        }
-      });
-
-    const roleDistribution = roles.map((role) => ({
-      role: role.name,
-      count: role.users.length
-    }));
+    logger.info("Admin: Metrics generated", { requestId });
 
     return {
-      totalUsers,
-      totalPatients,
-      totalDoctors,
-      roleDistribution
+      overview: {
+        totalUsers: userCounts,
+        totalPatients: patientCount,
+        totalDoctors: doctorCount,
+        totalAppointments: appointmentCount,
+      },
+      roleDistribution: roleStats.map(r => ({ role: r.name, count: r._count.users }))
     };
   }
 
-  async getLoginAuditHistory(
-  page = 1,
-  limit = 50
-) {
-  const skip = (page - 1) * limit;
+  /**
+   * Auditable Time-Series History
+   */
+  async getLoginAuditHistory(page: number, limit: number, requestId: string) {
+    const skip = (page - 1) * limit;
 
-  const [logs, total] = await Promise.all([
-    prisma.loginHistory.findMany({
-      skip,
-      take: limit,
-      orderBy: {
-        id: "desc",
-      },
-      include: {
-        user: {
-          select: {
-            email: true,
-            role: {
-              select: {
-                name: true,
-              },
-            },
-          },
+    const [logs, total] = await prisma.$transaction([
+      prisma.loginHistory.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" }, // Logic Fix: Order by time, not UUID
+        include: {
+          user: { select: { email: true, status: true } }
         },
+      }),
+      prisma.loginHistory.count(),
+    ]);
+
+    logger.info("Admin: Audit logs accessed", { requestId, page });
+
+    return {
+      meta: {
+        total,
+        page,
+        totalPages: Math.ceil(total / limit)
       },
-    }),
-    prisma.loginHistory.count(),
-  ]);
+      records: logs
+    };
+  }
 
-  return {
-    page,
-    limit,
-    total,
-    totalPages: Math.ceil(total / limit),
-    records: logs,
-  };
-}
+  /**
+   * Compliance-Safe Deactivation (Soft Delete)
+   */
+  async deactivateUserAccount(id: string, adminUserId: string, requestId: string) {
+    if (id === adminUserId) throw new Error('SELF_DELETE_FORBIDDEN');
 
-  async deleteUserAccount(
-    id: string,
-    adminId: string
-  ) {
-    if (id === adminId) {
-      throw new Error(
-        'Admin cannot delete own account'
-      );
-    }
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) throw new Error('NOT_FOUND');
 
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          id
+    return prisma.$transaction(async (tx) => {
+      // 1. Terminate all active sessions (Force logout)
+      await tx.session.deleteMany({ where: { userId: id } });
+      await tx.refreshToken.deleteMany({ where: { userId: id } });
+
+      // 2. Perform Soft Delete (Preserve data integrity for medical history)
+      const deactivatedUser = await tx.user.update({
+        where: { id },
+        data: {
+          status: UserStatus.SUSPENDED, // User can no longer log in
+          deletedAt: new Date()
         }
       });
 
-    if (!user) {
-      throw new Error(
-        'User not found'
-      );
-    }
-
-    await prisma.$transaction([
-      prisma.refreshToken.deleteMany({
-        where: {
-          userId: id
-        }
-      }),
-      prisma.loginHistory.deleteMany({
-        where: {
-          userId: id
-        }
-      }),
-      prisma.user.delete({
-        where: {
-          id
-        }
-      })
-    ]);
-
-    return true;
+      logger.warn("Admin: User account suspended", { requestId, targetUserId: id, performedBy: adminUserId });
+      return deactivatedUser;
+    });
   }
 }
