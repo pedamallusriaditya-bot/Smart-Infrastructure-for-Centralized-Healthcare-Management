@@ -2,125 +2,78 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { EmergencyService } from './emergency.service.js';
 import { successResponse, errorResponse } from '../../utils/response.util.js';
+import { logger } from '../../lib/logger.js';
 
 const emergencyService = new EmergencyService();
 
+// Schemas
 const RegisterStaffSchema = z.object({
+  targetUserId: z.string().uuid("Invalid User ID"), // Changed from req.user
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   shiftInfo: z.string().optional()
 });
 
-const UpdateShiftSchema = z.object({
-  shiftInfo: z.string().min(1)
+const EmergencyIncidentSchema = z.object({
+  description: z.string().min(5)
 });
 
-const StaffIdSchema = z.object({
-  id: z.string().uuid()
-});
-
-const NOT_FOUND_MESSAGES = new Set([
-  'Emergency staff not found'
-]);
-
-const CONFLICT_MESSAGES = new Set([
-  'Emergency staff already exists'
-]);
-
-/**
- * Maps a caught error to an HTTP response, mirroring the handle*Error
- * pattern used in doctor/admin/appointment controllers. Without this,
- * every failure here (validation, not-found, duplicate) fell through to a
- * blanket 400 with no machine-readable code.
- */
-function handleEmergencyError(res: Response, error: any, fallbackMessage: string) {
-  if (error instanceof z.ZodError) {
-    return errorResponse(res, 'Invalid request parameters', 400, 'VALIDATION_ERROR');
-  }
-
-  if (error instanceof Error && NOT_FOUND_MESSAGES.has(error.message)) {
-    return errorResponse(res, error.message, 404, 'NOT_FOUND');
-  }
-
-  if (error instanceof Error && CONFLICT_MESSAGES.has(error.message)) {
-    return errorResponse(res, error.message, 409, 'CONFLICT');
-  }
-
-  return errorResponse(res, fallbackMessage, 500, 'INTERNAL_SERVER_ERROR');
+function handleEmergencyError(res: Response, req: Request, error: any, fallback: string) {
+  logger.error("Emergency Logic Error", { requestId: req.requestId, error: error.message });
+  
+  if (error.message === 'UNAUTHORIZED_SHIFT_UPDATE') return errorResponse(res, "You cannot update another staff's shift", 403);
+  if (error.message.includes('not found')) return errorResponse(res, error.message, 404);
+  if (error.message.includes('already exists')) return errorResponse(res, error.message, 409);
+  
+  return errorResponse(res, fallback, 500);
 }
 
-export const registerEmergencyStaff = async (
-  req: Request,
-  res: Response
-) => {
+export const triggerEmergency = async (req: Request, res: Response): Promise<any> => {
   try {
-    if (!req.user) {
-      return errorResponse(res, "Unauthorized", 401);
+    const data = EmergencyIncidentSchema.parse(req.body);
+    const result = await emergencyService.createEmergencyIncident(req.user!.id, data);
+    return successResponse(res, "Emergency incident created. Help is on the way.", result, 201);
+  } catch (error: any) {
+    return handleEmergencyError(res, req, error, "Failed to trigger emergency");
+  }
+};
+
+export const resolveEmergency = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const result = await emergencyService.resolveEmergency(id);
+    return successResponse(res, "Emergency resolved", result);
+  } catch (error: any) {
+    return handleEmergencyError(res, req, error, "Failed to resolve incident");
+  }
+};
+
+export const registerEmergencyStaff = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { targetUserId, ...data } = RegisterStaffSchema.parse(req.body);
+    const staff = await emergencyService.registerStaff(targetUserId, data);
+    return successResponse(res, "Staff registered", staff, 201);
+  } catch (error: any) {
+    return handleEmergencyError(res, req, error, 'Failed to register staff');
+  }
+};
+
+// ... updateEmergencyShift now passes req.user.id for security check
+export const updateEmergencyShift = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { shiftInfo } = req.body;
+    const updated = await emergencyService.updateStaffShift(req.params.id, req.user!.id, req.user!.role, shiftInfo);
+    return successResponse(res, "Shift updated", updated);
+  } catch (error: any) {
+    return handleEmergencyError(res, req, error, 'Failed to update shift');
+  }
+};
+
+export const getActiveStaffList = async (_req: Request, res: Response): Promise<any> => {
+    try {
+      const staff = await emergencyService.getActiveStaff();
+      return successResponse(res, "Active staff retrieved", staff);
+    } catch (error: any) {
+        return errorResponse(res, "Failed", 500);
     }
-
-    const data =
-      RegisterStaffSchema.parse(req.body);
-
-    const staff =
-      await emergencyService.registerStaff(
-        req.user.id,
-        data
-      );
-
-    return successResponse(
-      res,
-      "Emergency staff registered successfully",
-      staff,
-      201
-    );
-  } catch (error: any) {
-    return handleEmergencyError(res, error, 'Failed to register emergency staff');
-  }
-};
-
-export const getActiveEmergencies = async (
-  _req: Request,
-  res: Response
-) => {
-  try {
-    const staff =
-      await emergencyService.getActiveStaff();
-
-    return successResponse(
-      res,
-      "Active emergency staff retrieved successfully",
-      staff,
-      200
-    );
-  } catch (error: any) {
-    return handleEmergencyError(res, error, 'Failed to retrieve emergency staff');
-  }
-};
-
-export const updateEmergencyShift = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const { id } =
-      StaffIdSchema.parse(req.params);
-
-    const { shiftInfo } =
-      UpdateShiftSchema.parse(req.body);
-
-    const updated =
-      await emergencyService.updateStaffShift(
-        id,
-        shiftInfo
-      );
-
-    return successResponse(
-      res,
-      "Emergency staff shift updated successfully",
-      updated,
-      200
-    );
-  } catch (error: any) {
-    return handleEmergencyError(res, error, 'Failed to update shift');
-  }
 };

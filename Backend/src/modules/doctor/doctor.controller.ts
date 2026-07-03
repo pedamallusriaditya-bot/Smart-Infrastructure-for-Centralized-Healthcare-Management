@@ -1,99 +1,77 @@
 import { Request, Response } from 'express';
-import { z } from 'zod';
 import { DoctorService } from './doctor.service.js';
 import { successResponse, errorResponse } from '../../utils/response.util.js';
+import { doctorQuerySchema, updateDoctorSchema } from '../../schemas/doctor.schema.js';
 import { logger } from '../../lib/logger.js';
+import { z } from 'zod';
 
 const doctorService = new DoctorService();
 
-const GetAllDoctorsQuerySchema = z.object({
-  specialization: z.string().optional()
-});
-
-const DoctorIdParamSchema = z.object({
-  doctorId: z.string().uuid("Invalid doctor ID format")
-});
-
-const NOT_FOUND_MESSAGES = new Set([
-  'Doctor profile not found',
-  'Doctor not found'
-]);
-
 /**
- * Maps a caught error to an HTTP response without leaking raw internal
- * error messages (e.g. Prisma/driver errors) to the client. Known
- * "not found" errors become 404s; Zod validation errors become 400s with a
- * clean message; anything else is logged and returned as a generic 500.
+ * Global Doctor Module Error Handler
  */
-function handleDoctorError(res: Response, error: any, fallbackMessage: string) {
-  if (error instanceof z.ZodError) {
-    return errorResponse(res, 'Invalid request parameters', 400, 'VALIDATION_ERROR');
+function handleDoctorError(res: Response, req: Request, error: any, fallback: string) {
+  logger.error("Doctor Operation Failed", { 
+    requestId: req.requestId, 
+    error: error.message 
+  });
+
+  if (error.message === 'DOCTOR_NOT_FOUND') {
+    return errorResponse(res, "Doctor profile not found", 404, "NOT_FOUND");
   }
 
-  if (error instanceof Error && NOT_FOUND_MESSAGES.has(error.message)) {
-    return errorResponse(res, error.message, 404, 'NOT_FOUND');
+  if (error.message === 'INVALID_DEPARTMENT') {
+    return errorResponse(res, "The assigned department is invalid", 400, "BAD_REQUEST");
   }
 
-  logger.error(fallbackMessage, { error: error?.message ?? error });
-  return errorResponse(res, fallbackMessage, 500, 'INTERNAL_SERVER_ERROR');
+  return errorResponse(res, fallback, 500, "INTERNAL_SERVER_ERROR");
 }
 
-export const getDoctorProfile = async (req: Request, res: Response) => {
+export const getDoctorProfile = async (req: Request, res: Response): Promise<any> => {
   try {
-    if (!req.user) {
-      return errorResponse(res, "Unauthorized", 401);
+    const doctor = await doctorService.getDoctorProfileByUserId(req.user!.id, req.requestId);
+    return successResponse(res, "Doctor profile retrieved successfully", doctor);
+  } catch (error: any) {
+    return handleDoctorError(res, req, error, "Failed to retrieve profile");
+  }
+};
+
+export const updateDoctorProfile = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const data = updateDoctorSchema.parse(req.body);
+    const updated = await doctorService.updateDoctorProfile(req.user!.id, data, req.requestId);
+    return successResponse(res, "Profile updated successfully", updated);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return errorResponse(res, error.issues[0]?.message || "Invalid data", 400);
     }
-
-    const doctor = await doctorService.getDoctorProfileByUserId(req.user.id);
-
-    return successResponse(
-      res,
-      "Doctor profile retrieved successfully",
-      doctor,
-      200
-    );
-  } catch (error: any) {
-    return handleDoctorError(res, error, 'Failed to retrieve doctor profile');
+    return handleDoctorError(res, req, error, "Failed to update profile");
   }
 };
 
-export const getAllDoctors = async (req: Request, res: Response) => {
+export const getAllDoctors = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { specialization } =
-      GetAllDoctorsQuerySchema.parse(req.query);
-
-    const doctors =
-      await doctorService.getAllDoctors(specialization);
-
-    return successResponse(
-      res,
-      "Doctors retrieved successfully",
-      doctors,
-      200
-    );
+    const { specialization, page, limit } = doctorQuerySchema.parse(req.query);
+    const doctors = await doctorService.getAllDoctors({
+      specialization,
+      skip: (page - 1) * limit,
+      take: limit
+    }, req.requestId);
+    return successResponse(res, "Doctors retrieved successfully", doctors);
   } catch (error: any) {
-    return handleDoctorError(res, error, 'Failed to retrieve doctors');
+    if (error instanceof z.ZodError) {
+      return errorResponse(res, "Invalid filter parameters", 400);
+    }
+    return handleDoctorError(res, req, error, "Failed to retrieve doctors list");
   }
 };
 
-export const getDoctorAnalytics = async (
-  req: Request,
-  res: Response
-) => {
+export const getDoctorAnalytics = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { doctorId } =
-      DoctorIdParamSchema.parse(req.params);
-
-    const analytics =
-      await doctorService.calculateDoctorWorkload(doctorId);
-
-    return successResponse(
-      res,
-      "Doctor analytics generated successfully",
-      analytics,
-      200
-    );
+    const { doctorId } = req.params;
+    const analytics = await doctorService.calculateWorkload(doctorId, req.requestId);
+    return successResponse(res, "Workload analytics generated", analytics);
   } catch (error: any) {
-    return handleDoctorError(res, error, 'Failed to generate analytics');
+    return handleDoctorError(res, req, error, "Failed to calculate analytics");
   }
 };

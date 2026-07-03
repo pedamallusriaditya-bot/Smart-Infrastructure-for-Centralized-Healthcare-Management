@@ -1,136 +1,122 @@
 import { prisma } from '../../lib/prisma.js';
+import { Specialization, StaffStatus } from '@prisma/client';
+import { logger } from '../../lib/logger.js';
 
 export class DoctorService {
-  async getDoctorProfileByUserId(userId: string) {
+  /**
+   * Fetches the doctor's specific clinical profile.
+   */
+  async getDoctorProfileByUserId(userId: string, requestId: string) {
     const doctor = await prisma.doctor.findUnique({
-      where: {
-        userId
-      },
+      where: { userId },
       include: {
-        user: {
-          select: {
-            email: true,
-            createdAt: true
-          }
-        },
-        appointments: true
+        department: { select: { id: true, name: true } },
+        user: { select: { email: true } },
+        _count: { select: { appointments: true } }
       }
     });
 
     if (!doctor) {
-      throw new Error('Doctor profile not found');
+      logger.warn("Profile retrieval failed: Doctor record missing", { requestId, userId });
+      throw new Error('DOCTOR_NOT_FOUND');
     }
 
     return doctor;
   }
 
-  async getAllDoctors(specialization?: string) {
-    return prisma.doctor.findMany({
-      where: specialization
-        ? {
-            specialization
-          }
-        : undefined,
+  /**
+   * Updates clinical data. Enforces immutability for critical credentials.
+   */
+  async updateDoctorProfile(userId: string, updateData: any, requestId: string) {
+    const currentDoctor = await prisma.doctor.findUnique({ where: { userId } });
+    if (!currentDoctor) {
+      logger.error("Update failed: Target doctor not found", { requestId, userId });
+      throw new Error('DOCTOR_NOT_FOUND');
+    }
+
+    // IDENTITY SECURITY: Strip licenseNumber from update payload if it somehow passed validation
+    const { licenseNumber, ...safeData } = updateData;
+
+    if (safeData.departmentId) {
+      const deptExists = await prisma.department.findUnique({
+        where: { id: safeData.departmentId }
+      });
+      if (!deptExists) {
+        logger.warn("Department link failed: Invalid ID", { requestId, departmentId: safeData.departmentId });
+        throw new Error('INVALID_DEPARTMENT');
+      }
+    }
+
+    const updated = await prisma.doctor.update({
+      where: { userId },
+      data: safeData,
+      include: { department: { select: { name: true } } }
+    });
+
+    logger.info("Doctor profile successfully updated", { requestId, userId, fields: Object.keys(safeData) });
+    return updated;
+  }
+
+  /**
+   * Global directory fetch for scheduling and patient portal.
+   */
+  async getAllDoctors(filters: { specialization?: Specialization, skip: number, take: number }, requestId: string) {
+    const doctors = await prisma.doctor.findMany({
+      where: {
+        specialization: filters.specialization,
+        status: 'ACTIVE' as StaffStatus // Healthcare Rule: only show active staff in listing
+      },
       select: {
         id: true,
         firstName: true,
         lastName: true,
         specialization: true,
-        licenseNumber: true
-      }
+        licenseNumber: true,
+        department: { select: { name: true } }
+      },
+      skip: filters.skip,
+      take: filters.take,
+      orderBy: { lastName: 'asc' }
     });
+
+    logger.info("Retrieved active doctor list", { requestId, count: doctors.length, filter: filters.specialization });
+    return doctors;
   }
 
-  async calculateDoctorWorkload(doctorId: string) {
-    const doctor =
-      await prisma.doctor.findUnique({
-        where: {
-          id: doctorId
-        }
-      });
-
-    if (!doctor) {
-      throw new Error('Doctor not found');
+  /**
+   * Critical analytics for admin resource management.
+   */
+  async calculateWorkload(doctorId: string, requestId: string) {
+    const doctorExists = await prisma.doctor.findUnique({ where: { id: doctorId } });
+    if (!doctorExists) {
+      logger.error("Analytics failed: Target ID missing", { requestId, doctorId });
+      throw new Error('DOCTOR_NOT_FOUND');
     }
 
-    const now = new Date();
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setUTCHours(23, 59, 59, 999);
 
-    const startOfDay =
-      new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate()
-      );
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        doctorId,
+        appointmentDate: { gte: startOfDay, lte: endOfDay }
+      }
+    });
 
-    const endOfDay =
-      new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        23,
-        59,
-        59
-      );
-
-    const appointments =
-      await prisma.appointment.findMany({
-        where: {
-          doctorId,
-          appointmentDate: {
-            gte: startOfDay,
-            lte: endOfDay
-          }
-        },
-        orderBy: {
-          appointmentDate: 'asc'
-        }
-      });
-
-    const patientsToday =
-      appointments.length;
-
-    let hoursWorked = 0;
-
-    if (patientsToday > 0) {
-      const firstAppointment =
-        new Date(
-          appointments[0].appointmentDate
-        ).getTime();
-
-      hoursWorked =
-        Math.max(
-          0,
-          (now.getTime() - firstAppointment) /
-          (1000 * 60 * 60)
-        );
-    }
-
-    let burnoutScore = 0;
-
-    if (hoursWorked > 10) burnoutScore += 3;
-    if (hoursWorked > 12) burnoutScore += 5;
-    if (patientsToday > 25) burnoutScore += 4;
-
-    let burnoutIndicator = 'LOW';
-
-    if (burnoutScore >= 5) {
-      burnoutIndicator = 'MEDIUM';
-    }
-
-    if (burnoutScore >= 8) {
-      burnoutIndicator = 'HIGH';
-    }
+    // Logging the successful generation for auditing
+    logger.info("Doctor workload metrics calculated", { 
+        requestId, 
+        doctorId, 
+        appointmentsCount: appointments.length 
+    });
 
     return {
       doctorId,
-      metrics: {
-        patientsToday,
-        hoursWorked: hoursWorked.toFixed(1),
-        averageWaitingTime:
-          patientsToday > 0 ? "15 mins" : "0 mins",
-        emergencyCases: 0,
-        burnoutIndicator
-      }
+      count: appointments.length,
+      indicator: appointments.length > 20 ? 'HIGH' : appointments.length > 10 ? 'MEDIUM' : 'LOW',
+      generatedAt: new Date().toISOString()
     };
   }
 }
