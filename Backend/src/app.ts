@@ -5,10 +5,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import swaggerUi from 'swagger-ui-express';
 import crypto from 'crypto';
-
+import hospitalRoutes from './modules/hospital/hospital.routes.js';
 import { env } from './config/env.config.js';
 import { swaggerSpec } from './config/swagger.js';
-
+import admissionRoutes from './modules/admission/admission.routes.js';
 // Module Routes
 import authRoutes from './modules/auth/auth.routes.js';
 import patientRoutes from './modules/patient/patient.routes.js';
@@ -76,7 +76,7 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 const API_PREFIX = '/api/v1';
-
+app.use(`${API_PREFIX}/admissions`, admissionRoutes);
 // 9. PRIMARY DOMAIN ROUTES
 app.use(`${API_PREFIX}/auth`, authRoutes);
 app.use(`${API_PREFIX}/patients`, patientRoutes);
@@ -86,12 +86,15 @@ app.use(`${API_PREFIX}/emergencies`, emergencyRoutes);
 app.use(`${API_PREFIX}/admin`, adminRoutes);
 app.use(`${API_PREFIX}/timeline`, apiRoutes);
 
-// 10. 404 ROUTE NOT FOUND HANDLER
-app.all('*', (req: Request, _res: Response, next: NextFunction) => {
-  next(new AppError(404, `The requested route ${req.originalUrl} was not found on this server.`));
-});
+
+
+app.use(`${API_PREFIX}/hospitals`, hospitalRoutes);
 
 // 11. GLOBAL ERROR HANDLING MIDDLEWARE (Last item)
 app.use(errorMiddleware);
+
+app.all('*', (req: Request, _res: Response, next: NextFunction) => {
+  next(new AppError(404, `Route ${req.originalUrl} not found`));
+});
 
 export default app;

@@ -1,57 +1,76 @@
 import { prisma } from '../lib/prisma.js';
+import { logger } from '../lib/logger.js';
 
-export const getPatientTimeline = async (patientId: string) => {
-  const appointments = await prisma.appointment.findMany({
-    where: { patientId }
-  });
+export class TimelineService {
+  /**
+   * Generates a unified chronological medical timeline for a patient.
+   * Logic updated to support new LabOrder schema and entity-based auditing.
+   */
+  async getTimeline(patientId: string, requestId: string) {
+    try {
+      // 1. Concurrent fetching of all timeline-relevant entities
+      const [appointments, labOrders, records] = await Promise.all([
+        prisma.appointment.findMany({
+          where: { patientId },
+          orderBy: { appointmentDate: 'desc' }
+        }),
+        // STRUCTURE FIX: Changed 'labTest' to 'labOrder' to match LIS Schema
+        prisma.labOrder.findMany({
+          where: { patientId },
+          orderBy: { createdAt: 'desc' }
+        }),
+        prisma.medicalRecord.findMany({
+          where: { patientId },
+          orderBy: { createdAt: 'desc' }
+        })
+      ]);
 
-  const prescriptions = await prisma.prescription.findMany({
-    where: { patientId },
-    include: {
-      medicines: {
-        include: {
-          medicine: true
+      // 2. Formatting Lab Results with explicit types to resolve 'any' warnings
+      const formattedLabs = labOrders.map((lab: any) => ({
+        ...lab,
+        entryType: 'LAB_ORDER',
+        date: lab.createdAt
+      }));
+
+      const formattedAppointments = appointments.map((appt: any) => ({
+        ...appt,
+        entryType: 'APPOINTMENT',
+        date: appt.appointmentDate
+      }));
+
+      const formattedRecords = records.map((rec: any) => ({
+        ...rec,
+        entryType: 'MEDICAL_RECORD',
+        date: rec.createdAt
+      }));
+
+      // 3. Merging and Sorting by date
+      const combinedTimeline = [
+        ...formattedLabs, 
+        ...formattedAppointments, 
+        ...formattedRecords
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // 4. AUDIT LOG STRUCTURE FIX: 
+      // Changed 'resourceId' to 'entityId' and 'resourceType' to 'entity'
+      await prisma.auditLog.create({
+        data: {
+          action: 'ACCESS_PATIENT_TIMELINE',
+          entity: 'Patient',      // Matches 'entity' in schema
+          entityId: patientId,    // Matches 'entityId' in schema (Fixes the TS Error)
+          details: {
+            requestId,
+            itemCount: combinedTimeline.length
+          }
         }
-      }
+      });
+
+      logger.info("Timeline generated successfully", { requestId, patientId });
+      return combinedTimeline;
+
+    } catch (error: any) {
+      logger.error("Timeline Generation Fault", { requestId, error: error.message });
+      throw error;
     }
-  });
-
-  const labTests = await prisma.labTest.findMany({
-    where: { patientId }
-  });
-
-  const timelineEvents = [
-    ...appointments.map((a) => ({
-      id: a.id,
-      type: "Appointment",
-      date: a.appointmentDate,
-      details: a.reason || "Routine Follow-up"
-    })),
-
-    ...prescriptions.map((p) => ({
-      id: p.id,
-      type: "Prescription",
-      date: p.createdAt,
-      details: p.medicines.length > 0
-        ? `Prescribed: ${p.medicines
-            .map((m) =>
-              `${m.medicine.name} (${m.quantity})`
-            )
-            .join(", ")}`
-        : "No medications listed"
-    })),
-
-    ...labTests.map((lab) => ({
-      id: lab.id,
-      type: "Lab Test",
-      date: lab.createdAt,
-      details: `${lab.testName} - ${lab.result ?? "Pending"}`
-    }))
-  ];
-
-  return timelineEvents.sort(
-    (a, b) =>
-      new Date(a.date).getTime() -
-      new Date(b.date).getTime()
-  );
-};
+  }
+}

@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-on-surface antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+
+  /* Material Symbols Configuration */
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    @apply align-middle;
+  }
+
+  /* Custom LIS Components */
+  .reference-bar {
+    @apply h-1 bg-gray-200 relative rounded-full;
+  }
+
+  .reference-indicator {
+    @apply h-2 w-0.5 bg-primary absolute -top-0.5;
+  }
+
+  /* Hide scrollbar for clean dashboards */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .clinical-input:focus {
+    @apply outline-none ring-2 ring-primary-container ring-offset-[-1px];
+  }
+}

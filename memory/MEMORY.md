@@ -1,1 +1,0 @@
-- [Fixed errors in appointments.e2e.test.ts](fixed-appointments-e2e-test.md) — Fixed imports by using path alias '@' and removing file extensions, plus fixed test logic for doctor-not-assigned test (added login validation and corrected status code from 500 to 403).

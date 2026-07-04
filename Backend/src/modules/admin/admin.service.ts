@@ -1,95 +1,143 @@
 import { prisma } from '../../lib/prisma.js';
-import { UserStatus } from '@prisma/client';
+import { UserStatus, ApprovalStatus } from '@prisma/client';
 import { logger } from '../../lib/logger.js';
 
 export class AdminService {
   /**
-   * Optimized Aggregations for the Admin Dashboard
+   * Helper: Get Admin's Hospital Context
    */
-  async getSystemMetrics(requestId: string) {
-    const [userCounts, patientCount, doctorCount, appointmentCount] = await Promise.all([
-      prisma.user.count(),
-      prisma.patient.count(),
-      prisma.doctor.count(),
-      prisma.appointment.count()
+  private async getAdminHospital(adminUserId: string) {
+    const admin = await prisma.admin.findUnique({ where: { userId: adminUserId } });
+    if (!admin || !admin.hospitalId) throw new Error("ADMIN_NOT_ASSIGNED_TO_HOSPITAL");
+    return admin.hospitalId;
+  }
+
+  /**
+   * Metrics scoped to the Admin's specific hospital
+   */
+  async getSystemMetrics(adminUserId: string, requestId: string) {
+    const hospitalId = await this.getAdminHospital(adminUserId);
+
+    const [patients, doctors, labOrders, rooms] = await Promise.all([
+      prisma.patient.count({ where: { appointments: { some: { doctor: { department: { hospitalId } } } } } }),
+      prisma.doctor.count({ where: { department: { hospitalId } } }),
+      prisma.labOrder.count({ where: { doctor: { department: { hospitalId } } } }),
+      prisma.room.findMany({
+        where: { hospitalId },
+        include: { beds: { select: { status: true } } }
+      })
     ]);
 
-    // Efficiently get distribution without fetching full user objects
-    const roleStats = await prisma.role.findMany({
+    const totalBeds = rooms.reduce((acc, r) => acc + r.beds.length, 0);
+    const occupiedBeds = rooms.reduce((acc, r) => acc + r.beds.filter(b => b.status === 'OCCUPIED').length, 0);
+
+    // FIXED: Consuming requestId in log
+    logger.info("Admin Metrics Generated", { 
+      requestId, 
+      adminUserId, 
+      hospitalId,
+      timestamp: new Date().toISOString() 
+    });
+
+    return {
+      stats: { patients, doctors, labOrders, totalBeds, occupiedBeds },
+      occupancyRate: totalBeds > 0 ? ((occupiedBeds / totalBeds) * 100).toFixed(1) + '%' : '0%'
+    };
+  }
+
+  /**
+   * Detailed Room-by-Room Statistics
+   */
+  async getBedOccupancy(adminUserId: string, requestId: string) {
+    const hospitalId = await this.getAdminHospital(adminUserId);
+
+    const roomStats = await prisma.room.findMany({
+      where: { hospitalId },
       select: {
-        name: true,
-        _count: { select: { users: true } }
+        roomNumber: true,
+        type: true,
+        _count: { select: { beds: true } },
+        beds: { select: { bedNumber: true, status: true } }
       }
     });
 
-    logger.info("Admin: Metrics generated", { requestId });
-
-    return {
-      overview: {
-        totalUsers: userCounts,
-        totalPatients: patientCount,
-        totalDoctors: doctorCount,
-        totalAppointments: appointmentCount,
-      },
-      roleDistribution: roleStats.map(r => ({ role: r.name, count: r._count.users }))
-    };
+    // FIXED: Consuming requestId in log
+    logger.info("Bed Occupancy Report Accessed", { requestId, hospitalId });
+    return roomStats;
   }
 
-  /**
-   * Auditable Time-Series History
-   */
-  async getLoginAuditHistory(page: number, limit: number, requestId: string) {
-    const skip = (page - 1) * limit;
+  async reviewDoctor(adminUserId: string, doctorId: string, status: 'APPROVED' | 'REJECTED', requestId: string) {
+    const hospitalId = await this.getAdminHospital(adminUserId);
+    const doctor = await prisma.doctor.findFirst({ 
+        where: { id: doctorId, department: { hospitalId } } 
+    });
 
-    const [logs, total] = await prisma.$transaction([
+    if (!doctor) throw new Error("DOCTOR_NOT_IN_YOUR_HOSPITAL");
+
+    const updated = await prisma.doctor.update({
+      where: { id: doctorId },
+      data: {
+        approvalStatus: status === 'APPROVED' ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED,
+        verifiedAt: new Date(),
+        verifiedBy: adminUserId
+      }
+    });
+
+    // FIXED: Consuming requestId in log
+    logger.warn(`Doctor Review Action: ${status}`, { requestId, adminUserId, targetDoctorId: doctorId });
+    return updated;
+  }
+
+  async getPendingDoctors(adminUserId: string, requestId: string) {
+    const hospitalId = await this.getAdminHospital(adminUserId);
+    
+    const pending = await prisma.doctor.findMany({
+      where: { 
+        approvalStatus: ApprovalStatus.PENDING,
+        department: { hospitalId } 
+      },
+      include: { 
+        department: { select: { name: true } }, 
+        user: { select: { email: true } } 
+      }
+    });
+
+    // FIXED: Consuming requestId in log
+    logger.info("Pending Doctors List Fetched", { requestId, hospitalId, count: pending.length });
+    return pending;
+  }
+
+  async getAuditHistory(page: number, limit: number, requestId: string) {
+    const skip = (page - 1) * limit;
+    const [records, total] = await prisma.$transaction([
       prisma.loginHistory.findMany({
+        take: limit, 
         skip,
-        take: limit,
-        orderBy: { createdAt: "desc" }, // Logic Fix: Order by time, not UUID
-        include: {
-          user: { select: { email: true, status: true } }
-        },
+        orderBy: { createdAt: 'desc' },
+        include: { user: { select: { email: true } } }
       }),
-      prisma.loginHistory.count(),
+      prisma.loginHistory.count()
     ]);
 
-    logger.info("Admin: Audit logs accessed", { requestId, page });
-
-    return {
-      meta: {
-        total,
-        page,
-        totalPages: Math.ceil(total / limit)
-      },
-      records: logs
-    };
+    // FIXED: Consuming requestId in log
+    logger.info("System Audit History Accessed", { requestId, page });
+    return { records, meta: { total, page } };
   }
 
-  /**
-   * Compliance-Safe Deactivation (Soft Delete)
-   */
-  async deactivateUserAccount(id: string, adminUserId: string, requestId: string) {
-    if (id === adminUserId) throw new Error('SELF_DELETE_FORBIDDEN');
-
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) throw new Error('NOT_FOUND');
+  async suspendUser(targetId: string, adminId: string, requestId: string) {
+    if (targetId === adminId) throw new Error("SELF_SUSPEND_FORBIDDEN");
 
     return prisma.$transaction(async (tx) => {
-      // 1. Terminate all active sessions (Force logout)
-      await tx.session.deleteMany({ where: { userId: id } });
-      await tx.refreshToken.deleteMany({ where: { userId: id } });
-
-      // 2. Perform Soft Delete (Preserve data integrity for medical history)
-      const deactivatedUser = await tx.user.update({
-        where: { id },
-        data: {
-          status: UserStatus.SUSPENDED, // User can no longer log in
-          deletedAt: new Date()
-        }
+      await tx.session.deleteMany({ where: { userId: targetId } });
+      
+      const suspended = await tx.user.update({
+        where: { id: targetId },
+        data: { status: UserStatus.SUSPENDED, deletedAt: new Date() }
       });
 
-      logger.warn("Admin: User account suspended", { requestId, targetUserId: id, performedBy: adminUserId });
-      return deactivatedUser;
+      // FIXED: Consuming requestId in log
+      logger.error("User Suspended by Admin", { requestId, adminId, targetUserId: targetId });
+      return suspended;
     });
   }
 }

@@ -1,30 +1,23 @@
 import { Router } from 'express';
-import {
-  getSystemMetrics,
-  getLoginAuditHistory,
-  deleteUserAccount
-} from './admin.controller.js';
+import * as ctrl from './admin.controller.js';
 import { authMiddleware } from '../../middleware/auth.middleware.js';
 import { requireRole } from '../../middleware/roles.middleware.js';
 
 const router = Router();
 
+// Global Protection
 router.use(authMiddleware);
 router.use(requireRole('ADMIN'));
 
-router.get(
-  '/metrics',
-  getSystemMetrics
-);
+// Dashboards
+router.get('/metrics', ctrl.getSystemMetrics);
+router.get('/audit', ctrl.getAuditLogs);
 
-router.get(
-  '/audit',
-  getLoginAuditHistory
-);
+// Clinical Governance (Credentialing)
+router.get('/doctors/pending', ctrl.getPendingDoctors);
+router.patch('/doctors/:doctorId/review', ctrl.reviewDoctorAccount);
 
-router.delete(
-  '/users/:id',
-  deleteUserAccount
-);
+// Account Lifecycle
+router.delete('/users/:id', ctrl.suspendUser);
 
 export default router;

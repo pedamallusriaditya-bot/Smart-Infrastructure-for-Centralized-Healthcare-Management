@@ -1,7 +1,7 @@
 {
   "name": "hospital-management-platform-backend",
   "version": "1.0.0",
-  "description": "AI-powered Hospital Management Platform Backend API Foundation",
+  "description": "CareHive Integrated Health System - AI-powered Backend",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
@@ -15,16 +15,21 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "prisma:seed": "prisma db seed",
     "lint": "eslint 'src/**/*.{ts,tsx}'",
     "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx}'"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "keywords": [
     "express",
     "typescript",
     "prisma",
     "postgresql",
-    "supabase"
+    "healthcare",
+    "carehive"
   ],
   "author": "",
   "license": "ISC",

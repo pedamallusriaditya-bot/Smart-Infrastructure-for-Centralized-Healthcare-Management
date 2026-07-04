@@ -6,6 +6,7 @@ import {
 } from "./appointment.controller.js";
 import { authMiddleware } from "../../middleware/auth.middleware.js";
 import { requireRole } from "../../middleware/roles.middleware.js";
+import { checkOwnership } from '../../middleware/ownership.middleware.js';
 
 const router = Router();
 
@@ -18,6 +19,11 @@ router.use(authMiddleware);
  */
 router.get("/", getAppointments);
 
+router.get('/:id', 
+  authMiddleware, 
+  checkOwnership('APPOINTMENT'), 
+  getAppointments
+);
 /**
  * POST /api/v1/appointments
  * Restricted to Patients creating their own bookings.

@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { getPatientTimeline } from '../../services/timeline.service.js';
+import { TimelineService } from '../../services/timeline.service.js';
 import { generateClinicalInsight } from '../../services/ai.service.js';
 import { successResponse, errorResponse } from '../../utils/response.util.js';
+const timelineService = new TimelineService();
 
 const PatientIdParamSchema = z.object({
   patientId: z.string().uuid("Invalid patient ID format")
@@ -12,7 +13,7 @@ export const fetchAITimeline = async (req: Request, res: Response) => {
   try {
     const { patientId } = PatientIdParamSchema.parse(req.params);
 
-    const timelineEvents = await getPatientTimeline(patientId);
+    const timelineEvents = await timelineService.getTimeline(patientId, req.requestId);
 
     let summary = "Insufficient data to generate an AI summary.";
 

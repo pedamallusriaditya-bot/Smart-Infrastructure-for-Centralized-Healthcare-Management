@@ -5,22 +5,11 @@ import { authMiddleware } from '../../middleware/auth.middleware.js';
 
 const router = Router();
 
-router.post(
-  '/login',
-  loginLimiter,
-  login
-);
+// Endpoint Mapping
+router.post('/login', loginLimiter, login);
+router.post('/register', registerLimiter, register);
 
-router.post(
-  '/register',
-  registerLimiter,
-  register
-);
-
-router.post(
-  '/logout',
-  authMiddleware,
-  logout
-);
+// Restricted Access
+router.post('/logout', authMiddleware, logout);
 
 export default router;
