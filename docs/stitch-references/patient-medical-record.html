@@ -1,0 +1,437 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Medical Records | MedAuth Suite</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#e1e3e4",
+                        "on-tertiary-fixed": "#001f2a",
+                        "on-primary-fixed": "#001b3d",
+                        "primary-container": "#005fb8",
+                        "primary": "#00488d",
+                        "tertiary-fixed-dim": "#adcbda",
+                        "surface-container": "#edeeef",
+                        "secondary": "#006a60",
+                        "on-tertiary-container": "#c1e0ef",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed": "#85f6e5",
+                        "on-surface": "#191c1d",
+                        "inverse-surface": "#2e3132",
+                        "primary-fixed": "#d6e3ff",
+                        "primary-fixed-dim": "#a8c8ff",
+                        "on-primary": "#ffffff",
+                        "on-secondary-container": "#007166",
+                        "surface": "#f8f9fa",
+                        "background": "#f8f9fa",
+                        "outline": "#727783",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#f8f9fa",
+                        "on-surface-variant": "#424752",
+                        "on-primary-container": "#cadcff",
+                        "tertiary-fixed": "#c9e7f7",
+                        "on-secondary-fixed": "#00201c",
+                        "on-error-container": "#93000a",
+                        "inverse-on-surface": "#f0f1f2",
+                        "secondary-container": "#85f6e5",
+                        "surface-tint": "#005db5",
+                        "on-secondary": "#ffffff",
+                        "on-background": "#191c1d",
+                        "tertiary": "#2f4c59",
+                        "tertiary-container": "#476471",
+                        "on-tertiary-fixed-variant": "#2e4b57",
+                        "surface-container-high": "#e7e8e9",
+                        "on-secondary-fixed-variant": "#005048",
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#f3f4f5",
+                        "inverse-primary": "#a8c8ff",
+                        "surface-dim": "#d9dadb",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#00468b",
+                        "surface-variant": "#e1e3e4",
+                        "secondary-fixed-dim": "#67d9c9",
+                        "on-tertiary": "#ffffff",
+                        "outline-variant": "#c2c6d4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "8px",
+                        "xl": "32px",
+                        "sm": "8px",
+                        "margin-desktop": "32px",
+                        "xs": "4px",
+                        "md": "16px",
+                        "margin-mobile": "16px",
+                        "lg": "24px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "title-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "letterSpacing": "0px", "fontWeight": "600"}],
+                        "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.1px", "fontWeight": "500"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500"}],
+                        "display-lg": ["57px", {"lineHeight": "64px", "letterSpacing": "-0.25px", "fontWeight": "700"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.25px", "fontWeight": "400"}],
+                        "title-lg": ["22px", {"lineHeight": "28px", "letterSpacing": "0px", "fontWeight": "500"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "0px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.5px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .record-card {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .record-card:hover {
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-on-surface">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-outline flex justify-between items-center w-full px-margin-desktop h-16 sticky top-0 z-50">
+<div class="flex items-center gap-xl">
+<span class="font-headline-lg text-headline-lg font-bold text-primary dark:text-primary-fixed-dim">CareHive</span>
+<nav class="hidden md:flex gap-lg items-center">
+<a class="text-on-surface-variant font-label-lg hover:bg-surface-container-high transition-colors px-3 py-2 rounded-lg cursor-pointer" href="#">Dashboard</a>
+<a class="text-primary font-bold font-label-lg hover:bg-surface-container-high transition-colors px-3 py-2 rounded-lg cursor-pointer" href="#">My Records</a>
+<a class="text-on-surface-variant font-label-lg hover:bg-surface-container-high transition-colors px-3 py-2 rounded-lg cursor-pointer" href="#">Appointments</a>
+<a class="text-on-surface-variant font-label-lg hover:bg-surface-container-high transition-colors px-3 py-2 rounded-lg cursor-pointer" href="#">Logout<br></a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-primary cursor-pointer active:opacity-80 p-2 hover:bg-surface-container-high rounded-full">help_outline</span>
+<span class="material-symbols-outlined text-primary cursor-pointer active:opacity-80 p-2 hover:bg-surface-container-high rounded-full">dark_mode</span>
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-xs">JD</div>
+</div>
+</header>
+<main class="flex-grow max-w-[1440px] mx-auto w-full px-margin-mobile md:px-margin-desktop py-lg">
+<!-- Patient Health Summary Header -->
+<section class="mb-xl">
+<div class="record-card p-lg flex flex-col md:flex-row gap-lg items-start md:items-center justify-between bg-gradient-to-r from-white to-surface-container-low">
+<div class="flex items-center gap-lg">
+<div class="relative">
+<img class="w-20 h-20 rounded-full border-4 border-white shadow-sm object-cover" data-alt="A professional, clinical-style portrait of a middle-aged male patient with a friendly but neutral expression, shot in a high-key medical studio environment. The lighting is soft and even, highlighting a clean, modern healthcare aesthetic. The background is a soft, out-of-focus medical office in muted blue and white tones. The overall mood is one of reliable healthcare and patient care." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxuM66dPWyiJdJ0aQR7hAqzKj1YvvXs_9sR8Z6mOtwyKGihxJDZMXH3nWV4YSHyV_ssPCo11g-KkBAylUSmj3e6ArFBlf3vFjISC0JD6ttBwpZPHnnt33tnzfAMCTN6YtpmPRWMgz3pot3Pb1TWIPqcygMxh065gk3tGE4MqKSqD4t4sSfGQ_3ebHgUIW-YVNVI6GRonKapxxKPGd6Y-RY5Ua6_d7JPyfoHWZeiRep2J2w6AN_uYcD6ILS3DeHzQHxNJc-mBPFwubd">
+<div class="absolute bottom-0 right-0 w-6 h-6 bg-secondary rounded-full border-2 border-white flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[14px] text-white" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">{patient.name}</h1>
+<div class="flex flex-wrap gap-md mt-xs font-label-md text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">cake</span> DOB: {patient.dob}</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">fingerprint</span> ID: {patient.medicalId}</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">bloodtype</span> Type: {patient.bloodGroup}</span>
+</div>
+</div>
+</div>
+<div class="flex gap-md w-full md:w-auto">
+<div class="flex-1 md:flex-none record-card bg-surface-container-lowest p-md border-primary/10 flex flex-col items-center">
+<span class="text-label-md text-on-surface-variant uppercase tracking-wider">Weight</span>
+<span class="text-title-lg font-bold text-primary">{patient.weight} kg</span>
+</div>
+<div class="flex-1 md:flex-none record-card bg-surface-container-lowest p-md border-primary/10 flex flex-col items-center">
+<span class="text-label-md text-on-surface-variant uppercase tracking-wider">Height</span>
+<span class="text-title-lg font-bold text-primary">{patient.height} cm</span>
+</div>
+<div class="flex-1 md:flex-none record-card bg-surface-container-lowest p-md border-primary/10 flex flex-col items-center">
+<span class="text-label-md text-on-surface-variant uppercase tracking-wider">BMI</span>
+<span class="text-title-lg font-bold text-secondary">{patient.bmi}</span>
+</div>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-xl items-start">
+<!-- Left Column: Primary Records & Timeline -->
+<div class="lg:col-span-8 space-y-xl">
+<!-- Medical Timeline -->
+<section>
+<div class="flex items-center justify-between mb-md">
+<h2 class="font-title-lg text-title-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">history</span>
+                            Medical Timeline
+                        </h2>
+<div class="flex items-center gap-sm">
+<div class="relative">
+<input class="bg-surface border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all w-48 md:w-64" placeholder="Search records..." type="text">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
+</div>
+<button class="p-2 border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">filter_list</span>
+</button>
+</div>
+</div>
+<div class="space-y-md">
+<!-- Timeline Entry 1 -->
+<div class="record-card p-md flex gap-lg">
+<div class="flex flex-col items-center shrink-0">
+<div class="w-10 h-10 rounded-full bg-primary-container/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined">stethoscope</span>
+</div>
+<div class="w-px h-full bg-outline-variant my-2"></div>
+</div>
+<div class="flex-grow pb-2">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-body-lg font-semibold">{record.consultationType}</h3>
+<p class="text-label-md text-on-surface-variant">{record.providerName} • {record.date}</p>
+</div>
+<span class="px-3 py-1 bg-surface-container-high text-on-surface-variant rounded-full text-xs font-medium">Completed</span>
+</div>
+<p class="mt-2 text-body-md text-on-surface leading-relaxed">{record.summaryNote}</p>
+<div class="mt-3 flex gap-sm">
+<button class="text-primary font-label-md hover:underline flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">description</span> View Notes
+                                    </button>
+</div>
+</div>
+</div>
+<!-- Timeline Entry 2 (Lab Report) -->
+<div class="record-card p-md flex gap-lg bg-surface-container-lowest">
+<div class="flex flex-col items-center shrink-0">
+<div class="w-10 h-10 rounded-full bg-secondary-container/20 text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined">biotech</span>
+</div>
+<div class="w-px h-full bg-outline-variant my-2"></div>
+</div>
+<div class="flex-grow pb-2">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-body-lg font-semibold">{lab.testName}</h3>
+<p class="text-label-md text-on-surface-variant">{lab.facility} • {lab.date}</p>
+</div>
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-xs font-medium">AI Analyzed</span>
+</div>
+<div class="mt-3 p-lg bg-primary-fixed/5 border border-primary-fixed rounded-xl">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="text-label-lg font-bold text-primary uppercase tracking-tighter">AI Health Summary</span>
+</div>
+<p class="text-body-md text-on-primary-fixed-variant leading-relaxed font-medium italic">
+                                        "{lab.aiSummary}"
+                                    </p>
+</div>
+<div class="mt-3 flex gap-md">
+<button class="px-4 py-1.5 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/5 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">download</span> PDF Report
+                                    </button>
+<button class="px-4 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-container transition-colors">
+                                        View Full Metrics
+                                    </button>
+</div>
+</div>
+</div>
+<!-- Timeline Entry 3 -->
+<div class="record-card p-md flex gap-lg opacity-80">
+<div class="flex flex-col items-center shrink-0">
+<div class="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined">vaccines</span>
+</div>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-body-lg font-semibold">{vax.name}</h3>
+<p class="text-label-md text-on-surface-variant">Immunization • {vax.date}</p>
+</div>
+</div>
+<p class="mt-2 text-body-md text-on-surface-variant italic">Lot: {vax.lotNumber} | Next Due: {vax.nextDue}</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Medications Grid -->
+<section>
+<div class="flex items-center justify-between mb-md">
+<h2 class="font-title-lg text-title-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">medication</span>
+                            Current Medications
+                        </h2>
+<button class="text-primary font-label-lg flex items-center gap-1 hover:bg-primary/5 px-2 py-1 rounded">
+                            History <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<div class="record-card p-lg border-l-4 border-l-primary">
+<div class="flex justify-between items-start mb-2">
+<span class="font-body-lg font-bold text-on-surface">{med.name}</span>
+<span class="text-xs font-bold text-primary uppercase">{med.dosage}</span>
+</div>
+<div class="space-y-2">
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+                                    {med.frequency}
+                                </div>
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-[18px]">event_repeat</span>
+                                    Refill by: {med.refillDate}
+                                </div>
+<div class="mt-3 pt-3 border-t border-outline-variant flex items-center justify-between">
+<span class="text-xs text-on-surface-variant italic">Prescribed by {med.doctor}</span>
+<button class="text-primary font-label-md font-bold">Request Refill</button>
+</div>
+</div>
+</div>
+<div class="record-card p-lg border-l-4 border-l-secondary">
+<div class="flex justify-between items-start mb-2">
+<span class="font-body-lg font-bold text-on-surface">{med2.name}</span>
+<span class="text-xs font-bold text-secondary uppercase">{med2.dosage}</span>
+</div>
+<div class="space-y-2">
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+                                    {med2.frequency}
+                                </div>
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-[18px]">event_repeat</span>
+                                    Refill by: {med2.refillDate}
+                                </div>
+<div class="mt-3 pt-3 border-t border-outline-variant flex items-center justify-between">
+<span class="text-xs text-on-surface-variant italic">Prescribed by {med2.doctor}</span>
+<button class="text-primary font-label-md font-bold">Request Refill</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Sidebar Modules -->
+<div class="lg:col-span-4 space-y-xl">
+<!-- Rapid Access QR Code -->
+<section class="record-card bg-primary text-white p-lg relative overflow-hidden">
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined">emergency_home</span>
+<h2 class="font-label-lg font-bold uppercase tracking-widest">Medical ID Card</h2>
+</div>
+<div class="bg-white p-3 rounded-xl w-32 h-32 mx-auto shadow-lg mb-4">
+<img class="w-full h-full" data-alt="A clean, high-contrast QR code generated on a crisp white background, specifically designed for scanning in medical settings. The image is minimalist and high-resolution, following the clinical aesthetic of the MedAuth Suite. The edges are sharp and the visual presentation is strictly functional and professional." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxhIP5EpWfXQTSCIixskNblY893sK-AHl1E8yUUB-AwgYX1NsW75nUXDlWJbaw3PlSl25a7DfRKH0fsUymKEJnWIV7TIJT33K1e0mRwTd3bdfOR9ep_zue9OAyxhvP238BozbJnjt-0oViW902y-tgqjX5IET9UhtPXWhOcwpSnAipNDvhZORgBjRnNDHlwV-6UeqQhMkx6B_Y41mK5cUy8KmGfbZsbf8beOH05zRZEkfW0R4ouM8sVHZgnvQNmv2UemNPmmNrfd1B">
+</div>
+<p class="text-center text-label-md opacity-90 mb-4 px-4">Emergency responders can scan this to access your critical health data.</p>
+<button class="w-full py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold transition-all backdrop-blur-md border border-white/30">
+                            Download Digital Pass
+                        </button>
+</div>
+<div class="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+</section>
+<!-- Diagnoses & Conditions -->
+<section class="record-card p-lg">
+<h2 class="font-title-lg text-on-surface mb-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">clinical_notes</span>
+                        Active Diagnoses
+                    </h2>
+<ul class="space-y-lg">
+<li class="flex items-start gap-md">
+<span class="w-2 h-2 rounded-full bg-error mt-2"></span>
+<div>
+<p class="font-body-lg font-semibold text-on-surface">{condition.primary}</p>
+<p class="text-label-md text-on-surface-variant">Diagnosed: {condition.date}</p>
+<span class="mt-2 inline-block px-2 py-0.5 bg-error-container text-on-error-container rounded text-[10px] font-bold uppercase">Chronic</span>
+</div>
+</li>
+<li class="flex items-start gap-md">
+<span class="w-2 h-2 rounded-full bg-secondary mt-2"></span>
+<div>
+<p class="font-body-lg font-semibold text-on-surface">{condition.secondary}</p>
+<p class="text-label-md text-on-surface-variant">Diagnosed: {condition.date2}</p>
+<span class="mt-2 inline-block px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[10px] font-bold uppercase">Managed</span>
+</div>
+</li>
+</ul>
+</section>
+<!-- Allergies & Emergency -->
+<section class="record-card p-lg border-2 border-error/20 bg-error/5">
+<h2 class="font-title-lg text-error mb-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">warning</span>
+                        Critical Information
+                    </h2>
+<div class="space-y-lg">
+<div>
+<p class="text-label-md font-bold text-error uppercase tracking-wider mb-2">Allergies</p>
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1 bg-error text-white rounded-full text-xs font-bold">{allergy.one}</span>
+<span class="px-3 py-1 bg-error text-white rounded-full text-xs font-bold">{allergy.two}</span>
+</div>
+</div>
+<div>
+<p class="text-label-md font-bold text-error uppercase tracking-wider mb-2">Emergency Contact</p>
+<div class="p-md bg-white border border-error/10 rounded-lg">
+<p class="font-body-lg font-bold text-on-surface">{emergency.contactName}</p>
+<p class="text-label-md text-on-surface-variant">{emergency.relationship}</p>
+<p class="text-body-md font-medium text-primary mt-1">{emergency.phone}</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface dark:bg-surface-dim border-t border-outline-variant flex flex-col md:flex-row justify-between items-center w-full px-margin-desktop py-lg mt-auto">
+<div class="flex flex-col items-center md:items-start mb-md md:mb-0">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">CareHive</span>
+<p class="font-label-md text-label-md text-secondary dark:text-secondary-fixed-dim mt-1">© 2024 CareHive MedAuth Clinical Systems. All rights reserved.</p>
+</div>
+<div class="flex gap-lg">
+<a class="text-on-surface-variant font-label-md hover:text-primary transition-colors cursor-pointer" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant font-label-md hover:text-primary transition-colors cursor-pointer" href="#">Terms of Service</a>
+<a class="text-on-surface-variant font-label-md hover:text-primary transition-colors cursor-pointer" href="#">Support</a>
+</div>
+</footer>
+<!-- FAB (Suppressed on Details Pages as per guidelines, but kept here for core records context if considered a top-level action) -->
+<button class="fixed bottom-margin-desktop right-margin-desktop w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform active:scale-95 group">
+<span class="material-symbols-outlined text-[24px]">add</span>
+<span class="absolute right-16 bg-on-surface text-white px-3 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Upload Record</span>
+</button>
+<script>
+        // Micro-interactions for searching/filtering
+        document.querySelector('input[placeholder="Search records..."]')?.addEventListener('input', (e) => {
+            console.log('Searching for:', e.target.value);
+            // In a real app, this would trigger a filter function on the timeline entries
+        });
+
+        // Theme toggle logic (Simplified)
+        let isDark = false;
+        const toggleBtn = document.querySelectorAll('.material-symbols-outlined')[1];
+        toggleBtn.addEventListener('click', () => {
+            isDark = !isDark;
+            document.documentElement.classList.toggle('dark');
+            toggleBtn.textContent = isDark ? 'light_mode' : 'dark_mode';
+        });
+    </script>
+
+
+</body></html>

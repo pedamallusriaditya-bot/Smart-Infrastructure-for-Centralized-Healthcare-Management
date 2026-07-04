@@ -1,0 +1,474 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Patient Dashboard - CareHive</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Shared Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary": "#2f4c59",
+                    "inverse-on-surface": "#f0f1f2",
+                    "on-primary-fixed-variant": "#00468b",
+                    "tertiary-fixed": "#c9e7f7",
+                    "primary-fixed-dim": "#a8c8ff",
+                    "surface-container-highest": "#e1e3e4",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#f3f4f5",
+                    "surface-container": "#edeeef",
+                    "on-tertiary-fixed": "#001f2a",
+                    "on-tertiary-fixed-variant": "#2e4b57",
+                    "on-background": "#191c1d",
+                    "surface": "#f8f9fa",
+                    "outline-variant": "#c2c6d4",
+                    "primary": "#00488d",
+                    "surface-tint": "#005db5",
+                    "on-primary-fixed": "#001b3d",
+                    "surface-variant": "#e1e3e4",
+                    "background": "#f8f9fa",
+                    "surface-bright": "#f8f9fa",
+                    "error-container": "#ffdad6",
+                    "inverse-surface": "#2e3132",
+                    "tertiary-container": "#476471",
+                    "secondary": "#006a60",
+                    "on-primary": "#ffffff",
+                    "secondary-fixed": "#85f6e5",
+                    "on-primary-container": "#cadcff",
+                    "on-secondary-fixed": "#00201c",
+                    "primary-fixed": "#d6e3ff",
+                    "on-surface": "#191c1d",
+                    "on-error-container": "#93000a",
+                    "secondary-container": "#85f6e5",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed-variant": "#005048",
+                    "inverse-primary": "#a8c8ff",
+                    "error": "#ba1a1a",
+                    "secondary-fixed-dim": "#67d9c9",
+                    "on-tertiary-container": "#c1e0ef",
+                    "primary-container": "#005fb8",
+                    "surface-dim": "#d9dadb",
+                    "tertiary-fixed-dim": "#adcbda",
+                    "on-secondary": "#ffffff",
+                    "surface-container-high": "#e7e8e9",
+                    "outline": "#727783",
+                    "on-error": "#ffffff",
+                    "on-surface-variant": "#424752",
+                    "on-secondary-container": "#007166"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "md": "16px",
+                    "xl": "32px",
+                    "gutter": "16px",
+                    "sm": "8px",
+                    "margin-mobile": "16px",
+                    "base": "8px",
+                    "lg": "24px",
+                    "margin-desktop": "32px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "title-lg": ["Inter"],
+                    "label-lg": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "0px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "letterSpacing": "0px", "fontWeight": "600"}],
+                    "display-lg": ["57px", {"lineHeight": "64px", "letterSpacing": "-0.25px", "fontWeight": "700"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.5px", "fontWeight": "400"}],
+                    "title-lg": ["22px", {"lineHeight": "28px", "letterSpacing": "0px", "fontWeight": "500"}],
+                    "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.1px", "fontWeight": "500"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.25px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { opacity: 0; transform: translateY(10px); animation: fadeIn 0.6s ease-out forwards; }
+        @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+        .stagger-1 { animation-delay: 0.1s; }
+        .stagger-2 { animation-delay: 0.2s; }
+        .stagger-3 { animation-delay: 0.3s; }
+        .stagger-4 { animation-delay: 0.4s; }
+        .stagger-5 { animation-delay: 0.5s; }
+        
+        .custom-shadow { box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05); }
+        .card-border { border: 1px solid #E0E0E0; }
+        
+        .activity-line::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 24px;
+            bottom: 0;
+            width: 2px;
+            background: #E1E3E4;
+        }
+        .activity-line:last-child::before { display: none; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface flex flex-col min-h-screen" style="overflow: auto;">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-outline flex justify-between items-center w-full px-margin-desktop h-16 sticky top-0 z-50">
+<div class="flex items-center gap-4">
+<span class="font-headline-lg text-headline-lg font-bold text-primary dark:text-primary-fixed-dim">CareHive</span>
+</div>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-primary font-bold font-title-lg text-title-lg hover:bg-surface-container-high transition-colors px-2 py-1 rounded" href="#">Dashboard</a>
+<a class="text-on-surface-variant font-title-lg text-title-lg hover:bg-surface-container-high transition-colors px-2 py-1 rounded" href="#">My Records</a>
+<a class="text-on-surface-variant font-title-lg text-title-lg hover:bg-surface-container-high transition-colors px-2 py-1 rounded" href="#">Appointments</a>
+<a class="text-on-surface-variant font-title-lg text-title-lg hover:bg-surface-container-high transition-colors px-2 py-1 rounded" href="#">Logout</a></nav>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary cursor-pointer active:opacity-80 p-2 rounded-full hover:bg-surface-container-high transition-colors">help_outline</button>
+<button class="material-symbols-outlined text-primary cursor-pointer active:opacity-80 p-2 rounded-full hover:bg-surface-container-high transition-colors">dark_mode</button>
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">JD</div>
+</div>
+</header>
+<main class="flex-grow w-full max-w-[1440px] mx-auto px-margin-mobile md:px-margin-desktop py-xl space-y-xl">
+<!-- Header Section -->
+<section class="fade-in stagger-1">
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Welcome back, {patient.name}</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-xs">Today is {appointment.date}</p>
+</section>
+<!-- Quick Actions (Mobile First) -->
+<section class="fade-in stagger-2 grid grid-cols-1 md:grid-cols-4 gap-md">
+<button class="flex items-center justify-center gap-base bg-primary text-on-primary py-lg px-xl rounded-lg font-label-lg text-label-lg shadow-md hover:opacity-90 transition-all cursor-pointer" onclick="openModal()">
+<span class="material-symbols-outlined">calendar_today</span>
+                Book Appointment
+            </button>
+<button class="flex items-center justify-center gap-base bg-error text-on-error py-lg px-xl rounded-lg font-label-lg text-label-lg shadow-md hover:opacity-90 transition-all cursor-pointer" onclick="openEmergencyModal()">
+<span class="material-symbols-outlined">emergency_share</span>
+                SOS / Emergency
+            </button>
+<button class="flex items-center justify-center gap-base border border-primary text-primary py-lg px-xl rounded-lg font-label-lg text-label-lg hover:bg-primary/5 transition-all cursor-pointer" onclick="openLabModal()">
+<span class="material-symbols-outlined">science</span>
+                Laboratory Results
+            </button>
+<button class="flex items-center justify-center gap-base border border-primary text-primary py-lg px-xl rounded-lg font-label-lg text-label-lg hover:bg-primary/5 transition-all cursor-pointer" onclick="openQRModal()">
+<span class="material-symbols-outlined">qr_code_2</span>
+                Medical QR
+            </button>
+</section>
+<!-- Main Dashboard Grid -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-xl"><!-- Row 2: 3-column layout -->
+<div class="md:col-span-4 fade-in stagger-3 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col justify-between"><div>
+<h2 class="font-title-lg text-title-lg text-on-surface mb-md">Health Summary</h2>
+<div class="grid grid-cols-2 gap-md mb-md">
+<div class="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Blood Group</span>
+<span class="font-title-lg text-title-lg text-primary">{patient.bloodGroup}</span>
+</div>
+<div class="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Age</span>
+<span class="font-title-lg text-title-lg text-on-surface">{patient.age}</span>
+</div>
+<div class="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Height</span>
+<span class="font-body-lg text-body-lg text-on-surface">{patient.height}</span>
+</div>
+<div class="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Weight</span>
+<span class="font-body-lg text-body-lg text-on-surface">{patient.weight}</span>
+</div>
+<div class="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">BMI</span>
+<span class="font-body-lg text-body-lg text-on-surface">{patient.bmi}</span>
+</div>
+<div class="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Emergency Status</span>
+<span class="font-body-lg text-body-lg text-on-surface">Waiting for Response</span>
+</div>
+</div>
+</div></div>
+<div class="md:col-span-4 fade-in stagger-4 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col"><div class="flex items-center gap-sm mb-md text-primary">
+<span class="material-symbols-outlined">event</span>
+<h2 class="font-title-lg text-title-lg text-on-surface">Upcoming Appointment</h2>
+</div>
+<div class="flex-grow space-y-sm mb-lg">
+<p class="font-label-lg text-label-lg text-on-surface">{appointment.doctorName}</p>
+<p class="font-body-md text-body-md text-on-surface-variant">{appointment.department} • {appointment.hospital}</p>
+<div class="flex items-center gap-sm text-primary">
+<span class="material-symbols-outlined text-body-md">calendar_month</span>
+<span class="font-body-md">{appointment.date} at {appointment.time}</span>
+</div>
+<span class="inline-block px-sm py-xs bg-primary/10 text-primary rounded text-label-md uppercase">{appointment.status}</span>
+</div>
+<button class="w-full text-center py-sm border-t border-outline-variant text-primary font-label-lg text-label-lg hover:bg-surface-container transition-colors cursor-pointer">View Appointment</button></div>
+<div class="md:col-span-4 fade-in stagger-5 bg-white card-border custom-shadow p-lg rounded-lg overflow-hidden relative group"><div class="relative z-10 flex flex-col h-full">
+<h3 class="font-title-lg text-title-lg mb-sm text-on-surface">AI Health Insights</h3>
+<div class="space-y-md flex-grow">
+<div>
+<p class="font-label-md text-on-surface-variant uppercase">Health Summary</p>
+<p class="font-body-md text-on-surface">Respiratory metrics showing positive trends.</p>
+</div>
+<div>
+<p class="font-label-md text-on-surface-variant uppercase">Risk Level</p>
+<p class="font-body-md text-secondary font-bold">LOW</p>
+</div>
+<div>
+<p class="font-label-md text-on-surface-variant uppercase">Preventive Suggestions</p>
+<p class="font-body-md text-on-surface">Maintain daily walking routine.</p>
+</div>
+</div>
+<button class="mt-lg w-full text-center py-sm border-t border-outline-variant text-primary font-label-lg text-label-lg hover:bg-surface-container transition-colors cursor-pointer">View Detailed Analysis</button>
+</div>
+<span class="material-symbols-outlined absolute -right-4 -bottom-4 text-[96px] text-primary opacity-10 group-hover:rotate-12 transition-transform">insights</span></div>
+<!-- Row 3: Full-width Medical Timeline -->
+<div class="md:col-span-6 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col">
+<h2 class="font-title-lg text-title-lg text-on-surface mb-md">Latest Laboratory Report</h2>
+<div class="flex-grow space-y-md mb-lg">
+<div class="flex justify-between border-b border-outline-variant pb-sm">
+<span class="text-body-md text-on-surface-variant">Test Name</span>
+<span class="text-body-md font-bold">Complete Blood Count</span>
+</div>
+<div class="flex justify-between border-b border-outline-variant pb-sm">
+<span class="text-body-md text-on-surface-variant">Report Date</span>
+<span class="text-body-md">Oct 24, 2024</span>
+</div>
+<div class="flex justify-between border-b border-outline-variant pb-sm">
+<span class="text-body-md text-on-surface-variant">AI Analysis</span>
+<span class="text-body-md text-secondary">Completed</span>
+</div>
+<div class="flex justify-between">
+<span class="text-body-md text-on-surface-variant">Overall Result</span>
+<span class="text-body-md font-bold text-primary">Normal</span>
+</div>
+</div>
+<div class="flex gap-md border-t border-outline-variant pt-md">
+<button class="flex-grow text-center py-sm text-primary font-label-lg hover:bg-surface-container transition-colors">View Report</button>
+<button class="flex-grow text-center py-sm text-primary font-label-lg hover:bg-surface-container transition-colors">Download PDF</button>
+</div>
+</div>
+<div class="md:col-span-6 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col">
+<h2 class="font-title-lg text-title-lg text-on-surface mb-md">Current Prescription</h2>
+<div class="flex-grow space-y-md mb-lg">
+<div class="p-md bg-surface-container rounded-lg">
+<p class="font-label-lg text-on-surface">Amoxicillin 500mg</p>
+<p class="text-body-md text-on-surface-variant">1 capsule • 3 times daily • 7 days</p>
+</div>
+<div class="p-md bg-surface-container rounded-lg">
+<p class="font-label-lg text-on-surface">Lisinopril 10mg</p>
+<p class="text-body-md text-on-surface-variant">1 tablet • Once daily • Ongoing</p>
+</div>
+</div>
+<button class="w-full text-center py-sm border-t border-outline-variant text-primary font-label-lg text-label-lg hover:bg-surface-container transition-colors">View Full Prescription</button>
+</div><!-- Row 3 -->
+<div class="md:col-span-6 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col">
+<h2 class="font-title-lg text-title-lg text-on-surface mb-md">Assigned Doctor</h2>
+<div class="flex items-center gap-lg mb-lg">
+<div class="w-20 h-20 rounded-full bg-surface-container overflow-hidden">{doctor.photo}</div>
+<div>
+<p class="font-title-lg text-on-surface">{doctor.name}</p>
+<p class="text-primary font-label-lg">{doctor.specialization}</p>
+<p class="text-body-md text-on-surface-variant">{doctor.department} • {doctor.hospital}</p>
+</div>
+</div>
+<div class="flex gap-md border-t border-outline-variant pt-md">
+<button class="flex-grow text-center py-sm text-primary font-label-lg hover:bg-surface-container transition-colors">View Profile</button>
+<button class="flex-grow text-center py-sm text-primary font-label-lg hover:bg-surface-container transition-colors">Book Follow-up</button>
+</div>
+</div>
+<!-- Row 4 -->
+<div class="md:col-span-8 bg-white card-border custom-shadow p-lg rounded-lg">
+<h2 class="font-title-lg text-title-lg text-on-surface mb-lg">Medical Timeline</h2>
+<div class="space-y-0">
+<div class="relative activity-line pb-lg flex gap-lg">
+<div class="w-4 h-4 rounded-full bg-primary mt-1.5 shrink-0 z-10"></div>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface">Consultation: General Checkup</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Today • General Hospital</p>
+</div>
+</div>
+<div class="relative activity-line pb-lg flex gap-lg">
+<div class="w-4 h-4 rounded-full bg-outline-variant mt-1.5 shrink-0 z-10"></div>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface">Prescription Updated: Amoxicillin</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Yesterday • Dr. Sarah Chen</p>
+</div>
+</div>
+<div class="relative activity-line pb-lg flex gap-lg">
+<div class="w-4 h-4 rounded-full bg-outline-variant mt-1.5 shrink-0 z-10"></div>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface">Lab Report: CBC Results</p>
+<p class="font-label-md text-label-md text-on-surface-variant">2 days ago • BioPath Labs</p>
+</div>
+</div>
+</div>
+</div>
+<div class="md:col-span-4 bg-white card-border custom-shadow p-lg rounded-lg">
+<h2 class="font-title-lg text-title-lg text-on-surface mb-md">Notifications</h2>
+<div class="space-y-md">
+<div class="flex gap-sm p-sm hover:bg-surface-container rounded transition-colors">
+<span class="material-symbols-outlined text-primary">event</span>
+<p class="text-body-md">Appointment tomorrow at 10:00 AM</p>
+</div>
+<div class="flex gap-sm p-sm hover:bg-surface-container rounded transition-colors">
+<span class="material-symbols-outlined text-secondary">science</span>
+<p class="text-body-md">New lab report available for download</p>
+</div>
+<div class="flex gap-sm p-sm hover:bg-surface-container rounded transition-colors">
+<span class="material-symbols-outlined text-primary">medication</span>
+<p class="text-body-md">Prescription updated by Dr. Chen</p>
+</div>
+</div>
+</div>
+<!-- Row 5: Quick Access -->
+<div class="md:col-span-12">
+<h2 class="font-title-lg text-title-lg text-on-surface mb-md">Quick Access</h2>
+<div class="grid grid-cols-2 md:grid-cols-6 gap-md">
+<div class="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+<span class="material-symbols-outlined text-primary mb-xs">folder_shared</span>
+<p class="text-label-md">Medical Records</p>
+</div>
+<div class="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+<span class="material-symbols-outlined text-primary mb-xs">history</span>
+<p class="text-label-md">Appointment History</p>
+</div>
+<div class="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+<span class="material-symbols-outlined text-primary mb-xs">biotech</span>
+<p class="text-label-md">Lab Reports</p>
+</div>
+<div class="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+<span class="material-symbols-outlined text-primary mb-xs">emergency</span>
+<p class="text-label-md">Emergency History</p>
+</div>
+<div class="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+<span class="material-symbols-outlined text-primary mb-xs">person</span>
+<p class="text-label-md">Profile</p>
+</div>
+<div class="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+<span class="material-symbols-outlined text-primary mb-xs">logout</span>
+<p class="text-label-md">Logout</p>
+</div></div>
+</div></div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface dark:bg-surface-dim border-t border-outline-variant flex flex-col md:flex-row justify-between items-center w-full px-margin-desktop py-lg mt-auto">
+<div class="mb-md md:mb-0">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">CareHive</span>
+<p class="font-label-md text-label-md text-secondary dark:text-secondary-fixed-dim mt-xs">© 2024 CareHive. All rights reserved.</p>
+</div>
+<div class="flex gap-xl">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer" href="#">Privacy Policy</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer" href="#">Terms of Service</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer" href="#">Support</a>
+</div>
+</footer>
+<!-- Simple Booking Modal (Simplified for Demo) -->
+<div class="fixed inset-0 bg-black/50 z-[100] items-center justify-center p-md hidden" id="bookingModal">
+<div class="bg-white rounded-lg w-full max-w-md p-xl custom-shadow animate-in slide-in-from-bottom duration-300"><div class="flex justify-between items-center mb-xl">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Book Appointment</h2>
+<button class="material-symbols-outlined text-on-surface-variant cursor-pointer" onclick="closeModal()">close</button>
+</div>
+<div class="space-y-lg">
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface-variant">Select Specialization</label>
+<select class="w-full border border-outline rounded p-md font-body-md text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all">
+<option value="">Choose a specialization...</option>
+<option value="cardiology">General Cardiology</option>
+<option value="neurology">Neurology</option>
+<option value="dermatology">Dermatology</option>
+<option value="pediatrics">Pediatrics</option>
+</select>
+</div>
+<div class="space-y-sm">
+<label class="font-label-md text-label-md text-on-surface-variant">Available Doctors</label>
+<div class="max-h-64 overflow-y-auto space-y-sm pr-2">
+<!-- Doctor Card 1 -->
+<div class="p-md border border-outline-variant rounded-lg hover:border-primary hover:bg-primary/5 cursor-pointer transition-all group border-primary bg-primary/5">
+<div class="flex justify-between items-start">
+<div>
+<p class="font-label-lg text-label-lg text-on-surface group-hover:text-primary">Dr. Sarah Chen</p>
+<p class="font-label-md text-label-md text-primary">Cardiology</p>
+<p class="font-body-md text-body-md text-on-surface-variant mt-xs">Central General Hospital</p>
+</div>
+<span class="material-symbols-outlined text-primary group-hover:opacity-100 transition-opacity">check_circle</span>
+</div>
+</div>
+<!-- Doctor Card 2 -->
+<div class="p-md border border-outline-variant rounded-lg hover:border-primary hover:bg-primary/5 cursor-pointer transition-all group">
+<div class="flex justify-between items-start">
+<div>
+<p class="font-label-lg text-label-lg text-on-surface group-hover:text-primary">Dr. Marcus Thorne</p>
+<p class="font-label-md text-label-md text-primary">Cardiology</p>
+<p class="font-body-md text-body-md text-on-surface-variant mt-xs">City Medical Center</p>
+</div>
+<span class="material-symbols-outlined text-primary opacity-0 group-hover:opacity-100 transition-opacity">check_circle</span>
+</div>
+</div>
+</div>
+</div><div class="space-y-xs animate-in fade-in">
+<label class="font-label-md text-label-md text-on-surface-variant">Available Time Slots</label>
+<div class="grid grid-cols-3 gap-sm">
+<button class="py-2 px-md border border-primary text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-colors cursor-pointer">09:00 AM</button>
+<button class="py-2 px-md border border-outline-variant text-on-surface-variant rounded-full font-label-md text-label-md opacity-50 cursor-not-allowed" disabled="">10:30 AM</button>
+<button class="py-2 px-md border border-primary text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-colors cursor-pointer">11:00 AM</button>
+<button class="py-2 px-md border border-primary text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-colors cursor-pointer">02:00 PM</button>
+<button class="py-2 px-md border border-outline-variant text-on-surface-variant rounded-full font-label-md text-label-md opacity-50 cursor-not-allowed" disabled="">03:30 PM</button>
+<button class="py-2 px-md border border-primary text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-colors cursor-pointer">04:15 PM</button>
+</div>
+</div>
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface-variant">Preferred Date</label>
+<input class="w-full border border-outline rounded p-md font-body-md text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" type="date">
+</div>
+<button class="w-full bg-primary text-on-primary py-lg rounded-lg font-label-lg text-label-lg shadow hover:opacity-90 transition-all flex items-center justify-center gap-sm" onclick="closeModal()">
+<span class="material-symbols-outlined">calendar_month</span>
+Confirm Appointment
+</button>
+</div></div>
+</div>
+<script>
+        function openModal() {
+            const modal = document.getElementById('bookingModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('bookingModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal on clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('bookingModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        // Simulating data loading check for empty state illustration
+        document.addEventListener('DOMContentLoaded', () => {
+            const appointmentDate = "{appointment.date}";
+            // If the variable is still the placeholder or empty, we'd normally show the empty state.
+            // For the demo, we keep the data visible.
+            if (!appointmentDate || appointmentDate === "{appointment.date}") {
+                // Example: document.getElementById('empty-appointment').classList.remove('hidden');
+            }
+        });
+    </script>
+<div class="fixed inset-0 bg-black/50 z-[100] hidden items-center justify-center p-md" id="qrModal"><div class="bg-white rounded-lg w-full max-w-md p-xl custom-shadow animate-in slide-in-from-bottom duration-300 relative"><button class="material-symbols-outlined absolute right-md top-md text-on-surface-variant cursor-pointer" onclick="closeQRModal()">close</button><div class="flex flex-col items-center gap-lg"><h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface text-center">Medical QR ID</h2><div class="w-64 h-64 bg-white p-2 border-2 border-primary rounded-lg overflow-hidden"><img alt="Medical QR Code" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida/AP1WRLtiaJ79dzWJmIXv-Mw8Cp4uaIr7KPkTU9TWsD9e_-dmcZae0Ec4-XEFLnAZ0xs555UU21w4ceVf4NURvnTrn7WOLn9ScWe4rjWhpst78twRA5HDxbeJlMbOAWM_AUDQpv1IBed9bB-O723BNkgEvYiiLHHuG2-kUjkjP485GQQu3Y6aLaiLlh39PxitNLDEr1JZ-32SeijsvsgK_9ttLwq6XGW7FXnHm_p4-WBxDRNATLrhBMvbowwkUmbT"></div><div class="w-full space-y-sm bg-surface-container p-md rounded-lg"><div class="flex justify-between"><span class="text-label-md text-on-surface-variant uppercase">Patient</span><span class="text-label-lg font-bold text-on-surface">John Doe</span></div><div class="flex justify-between"><span class="text-label-md text-on-surface-variant uppercase">Blood Group</span><span class="text-label-lg font-bold text-error">O+</span></div><div class="flex justify-between"><span class="text-label-md text-on-surface-variant uppercase">Emergency Contact</span><span class="text-label-lg font-bold text-on-surface">+1 555-0199</span></div></div><p class="text-center text-body-md text-on-surface-variant px-md">Scan this code at any CareHive certified clinic to share your medical history securely.</p><button class="w-full bg-primary text-on-primary py-lg rounded-lg font-label-lg text-label-lg shadow hover:opacity-90 transition-all flex items-center justify-center gap-sm"><span class="material-symbols-outlined">download</span>Download QR Code</button></div></div></div><div class="fixed inset-0 bg-black/50 z-[100] hidden items-center justify-center p-md" id="labModal"><div class="bg-white rounded-lg w-full max-w-4xl h-[90vh] flex flex-col custom-shadow animate-in slide-in-from-bottom duration-300 overflow-hidden"><div class="flex justify-between items-center p-lg border-b border-outline-variant"><div class="flex items-center gap-md"><span class="material-symbols-outlined text-primary">science</span><h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Lab Results Detail</h2></div><div class="flex items-center gap-md"><button class="flex items-center gap-xs text-primary font-label-lg hover:bg-primary/5 px-md py-sm rounded"><span class="material-symbols-outlined">picture_as_pdf</span>Export PDF</button><button class="material-symbols-outlined text-on-surface-variant cursor-pointer" onclick="closeLabModal()">close</button></div></div><div class="flex border-b border-outline-variant px-lg"><button class="px-lg py-md border-b-2 border-primary text-primary font-label-lg">Overview</button><button class="px-lg py-md text-on-surface-variant font-label-lg hover:bg-surface-container">Historical Trends</button><button class="px-lg py-md text-on-surface-variant font-label-lg hover:bg-surface-container">AI Interpretation</button></div><div class="flex-grow overflow-y-auto p-lg space-y-xl"><section><h3 class="font-title-lg text-title-lg mb-md">Current Results</h3><table class="w-full text-left border-collapse"><thead class="bg-surface-container"><tr class="text-label-md text-on-surface-variant uppercase"> <th class="p-md">Test Name</th> <th class="p-md">Result</th> <th class="p-md">Reference Range</th> <th class="p-md">Status</th></tr></thead><tbody class="text-body-md"> <tr class="border-b border-outline-variant"> <td class="p-md">Glucose (Fasting)</td> <td class="p-md font-bold text-error">110 mg/dL</td> <td class="p-md">70 - 99 mg/dL</td> <td class="p-md"><span class="bg-error/10 text-error px-sm py-xs rounded text-label-md">ABNORMAL</span></td> </tr> <tr class="border-b border-outline-variant"> <td class="p-md">Hemoglobin A1c</td> <td class="p-md font-bold">5.4%</td> <td class="p-md">4.0 - 5.6%</td> <td class="p-md"><span class="bg-secondary/10 text-secondary px-sm py-xs rounded text-label-md">NORMAL</span></td> </tr> <tr class="border-b border-outline-variant"> <td class="p-md">Total Cholesterol</td> <td class="p-md font-bold">185 mg/dL</td> <td class="p-md">&lt; 200 mg/dL</td> <td class="p-md"><span class="bg-secondary/10 text-secondary px-sm py-xs rounded text-label-md">NORMAL</span></td> </tr></tbody></table></section><section><h3 class="font-title-lg text-title-lg mb-md">AI Interpretation</h3><div class="p-lg bg-primary/5 rounded-lg border border-primary/20"><p class="text-body-lg text-on-surface mb-md">Your fasting glucose levels are slightly elevated compared to your previous baseline. This may be due to recent dietary changes or stress levels.</p><div class="grid grid-cols-1 md:grid-cols-2 gap-md"><div class="p-md bg-white rounded border border-error/30 flex items-center gap-md"><span class="material-symbols-outlined text-error">warning</span><div><p class="text-label-md text-on-surface-variant uppercase">Flagged Value</p><p class="text-body-md font-bold text-error">Glucose: 110 mg/dL</p></div></div><div class="p-md bg-white rounded border border-outline-variant flex items-center gap-md"><span class="material-symbols-outlined text-primary">info</span><div><p class="text-label-md text-on-surface-variant uppercase">Recommendation</p><p class="text-body-md">Monitor carbohydrate intake</p></div></div></div></div></section></div></div></div>
+<div class="fixed inset-0 bg-black/50 z-[100] hidden items-center justify-center p-md" id="emergencyModal"><div class="bg-white rounded-lg w-full max-w-md p-xl custom-shadow animate-in slide-in-from-bottom duration-300 relative" id="emergencyModalContent"><div class="flex justify-between items-start mb-lg"><div><h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Emergency Assistance</h2><p class="text-body-md text-on-surface-variant">Provide a few details before sending your emergency request.</p></div><button class="material-symbols-outlined text-on-surface-variant cursor-pointer" onclick="closeEmergencyModal()">close</button></div><div class="space-y-lg" id="emergencyForm"><div class="space-y-sm"><label class="font-label-md text-label-md text-on-surface-variant uppercase">Emergency Reason</label><div class="grid grid-cols-1 gap-sm"><label class="flex items-center gap-md p-md border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container"><input class="w-4 h-4 text-error focus:ring-error" name="reason" type="radio" value="Chest Pain"> <span class="text-body-md">Chest Pain</span></label><label class="flex items-center gap-md p-md border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container"><input class="w-4 h-4 text-error focus:ring-error" name="reason" type="radio" value="Difficulty Breathing"> <span class="text-body-md">Difficulty Breathing</span></label><label class="flex items-center gap-md p-md border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container"><input class="w-4 h-4 text-error focus:ring-error" name="reason" type="radio" value="Accident / Injury"> <span class="text-body-md">Accident / Injury</span></label><label class="flex items-center gap-md p-md border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container"><input class="w-4 h-4 text-error focus:ring-error" name="reason" type="radio" value="Other"> <span class="text-body-md">Other</span></label></div></div><div class="space-y-xs"><label class="font-label-md text-label-md text-on-surface-variant uppercase">Additional Description (Optional)</label><textarea class="w-full border border-outline rounded p-md font-body-md text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all h-20" placeholder="Describe your emergency or provide any additional information."></textarea></div><div class="p-md bg-surface-container rounded-lg flex items-center gap-md"><span class="material-symbols-outlined text-primary animate-pulse">location_on</span><div><p class="text-label-md font-bold text-primary">Detecting your location...</p><p class="text-body-md text-on-surface-variant">Your current location is being detected on this device.</p></div></div><div class="flex gap-md pt-md"><button class="flex-grow py-sm border border-outline-variant rounded font-label-lg text-on-surface-variant hover:bg-surface-container transition-colors" onclick="closeEmergencyModal()">Cancel</button><button class="flex-grow py-sm bg-error text-on-error rounded font-label-lg shadow hover:opacity-90 transition-all" onclick="sendEmergencyAlert()">Send Emergency Alert</button></div></div></div></div><script>function openEmergencyModal(){const m=document.getElementById('emergencyModal');m.classList.remove('hidden');m.classList.add('flex');document.body.style.overflow='hidden';setTimeout(()=>{const loc=m.querySelector('.bg-surface-container');loc.innerHTML='<span class="material-symbols-outlined text-secondary">check_circle</span><div><p class="text-label-md font-bold text-secondary">Current location detected successfully.</p><p class="text-body-md text-on-surface-variant">Your current location has been detected on this device.</p></div>';},2000);}function closeEmergencyModal(){const m=document.getElementById('emergencyModal');m.classList.add('hidden');m.classList.remove('flex');document.body.style.overflow='auto';}function sendEmergencyAlert(){const content=document.getElementById('emergencyModalContent');content.innerHTML='<div class="flex flex-col items-center text-center py-xl space-y-md"><span class="material-symbols-outlined text-[64px] text-secondary">check_circle</span><h2 class="font-headline-lg text-headline-lg text-on-surface">Emergency Alert Sent</h2><p class="text-body-lg text-on-surface-variant">Your emergency request has been successfully submitted. Hospital staff have been notified.</p><p class="text-body-md text-secondary">Location was successfully detected on your device.</p><button class="mt-xl w-full py-sm bg-primary text-on-primary rounded font-label-lg" onclick="closeEmergencyModal()">Close</button></div>';const statusEl=document.querySelector('.md\\:col-span-4 .p-md:last-child span:last-child');if(statusEl){statusEl.textContent='Emergency Active';statusEl.classList.add('text-error','font-bold');}}</script></body></html>
