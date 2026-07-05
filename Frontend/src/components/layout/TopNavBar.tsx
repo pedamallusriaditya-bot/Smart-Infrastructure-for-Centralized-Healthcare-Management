@@ -1,46 +1,90 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Bell, User as UserIcon } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
-// Step 1: Define every prop you want to use
+// Step 1: Define prop types
 interface TopNavBarProps {
   userName?: string;
-  userRole?: string; // This fixes the 'Property does not exist' error
+  userRole?: string;
 }
 
 const TopNavBar: React.FC<TopNavBarProps> = ({ 
-  userName = "Medical Personnel", 
-  userRole = "Clinical Staff" 
+  userName, 
+  userRole 
 }) => {
-  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  // Determine user display details
+  const displayUserName = userName || (user ? `${user.firstName} ${user.lastName}` : "Medical Personnel");
+
+  // Get initials for user avatar
+  const getInitials = (name: string) => {
+    if (!name) return "JD";
+    return name
+      .split(' ')
+      .filter(n => n.length > 0)
+      .map(n => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
+  const initials = getInitials(displayUserName);
+
+  // Link CSS classes
+  const getLinkClass = ({ isActive }: { isActive: boolean }) =>
+    isActive
+      ? "text-primary font-bold font-title-lg text-title-lg hover:bg-surface-container-high transition-colors px-2 py-1 rounded"
+      : "text-on-surface-variant font-title-lg text-title-lg hover:bg-surface-container-high transition-colors px-2 py-1 rounded";
 
   return (
-    <nav className="bg-white border-b border-gray-200 flex justify-between items-center w-full px-8 h-16 sticky top-0 z-50">
-      <div className="font-bold text-2xl text-[#00488d] tracking-tighter">
-        CareHive
+    <header className="bg-white border-b border-outline-variant flex justify-between items-center w-full px-margin-desktop h-16 sticky top-0 z-50">
+      <div className="flex items-center gap-4">
+        <span className="font-headline-lg text-headline-lg font-bold text-primary dark:text-primary-fixed-dim">
+          CareHive
+        </span>
       </div>
 
-      <div className="flex items-center gap-5">
-        <button className="relative p-2 text-gray-400 hover:bg-gray-100 rounded-full">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
-
-        <div className="flex items-center gap-3 pl-4 border-l border-gray-100">
-          <div className="text-right hidden sm:block">
-             <p className="text-sm font-black text-slate-800 leading-none mb-1">{userName}</p>
-             <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest">{userRole}</p>
-          </div>
-          <button 
-            onClick={() => navigate('/login')}
-            className="w-10 h-10 rounded-xl bg-[#00488d] text-white flex items-center justify-center shadow-lg shadow-blue-100"
+      {/* Navigation menu for Patients */}
+      {user?.role === 'PATIENT' && (
+        <nav className="hidden md:flex gap-6 items-center">
+          <NavLink to="/patient/dashboard" className={getLinkClass}>
+            Dashboard
+          </NavLink>
+          <NavLink to="/patient/my-records" className={getLinkClass}>
+            My Records
+          </NavLink>
+          <NavLink to="/patient/appointments" className={getLinkClass}>
+            Appointments
+          </NavLink>
+          <button
+            onClick={logout}
+            className="text-on-surface-variant font-title-lg text-title-lg hover:bg-surface-container-high transition-colors px-2 py-1 rounded text-left"
           >
-            <UserIcon size={18} />
+            Logout
           </button>
+        </nav>
+      )}
+
+      {/* Right side utilities */}
+      <div className="flex items-center gap-4">
+        <button className="material-symbols-outlined text-primary cursor-pointer active:opacity-80 p-2 rounded-full hover:bg-surface-container-high transition-colors">
+          help_outline
+        </button>
+        <button 
+          onClick={() => {
+            document.documentElement.classList.toggle('dark');
+          }}
+          className="material-symbols-outlined text-primary cursor-pointer active:opacity-80 p-2 rounded-full hover:bg-surface-container-high transition-colors"
+        >
+          dark_mode
+        </button>
+        <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
+          {initials}
         </div>
       </div>
-    </nav>
+    </header>
   );
 };
 
-export default TopNavBar;
+export default TopNavBar;

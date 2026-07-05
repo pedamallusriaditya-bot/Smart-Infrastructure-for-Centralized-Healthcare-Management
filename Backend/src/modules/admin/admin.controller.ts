@@ -110,3 +110,67 @@ export const suspendUser = asyncHandler(async (req: Request, res: Response): Pro
     return errorResponse(res, "Suspension failed", 500);
   }
 });
+
+export const getBedOccupancy = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  try {
+    const occupancy = await adminService.getBedOccupancy(req.user!.id, req.requestId);
+    return successResponse(res, "Bed occupancy metrics fetched", occupancy, 200);
+  } catch (error: any) {
+    return errorResponse(res, "Failed to load occupancy logs", 500);
+  }
+});
+
+export const createDepartment = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { name, status } = req.body;
+    if (!name) return errorResponse(res, "Department name is required.", 400);
+    const dept = await adminService.createDepartment(req.user!.id, name, status || 'ACTIVE', req.requestId);
+    return successResponse(res, "Department created successfully.", dept, 201);
+  } catch (error: any) {
+    if (error.message === "DEPARTMENT_ALREADY_EXISTS") {
+      return errorResponse(res, "A department with this name already exists in this hospital.", 400);
+    }
+    return errorResponse(res, "Department creation failed: " + error.message, 500);
+  }
+});
+
+export const updateDepartment = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const { name, status } = req.body;
+    const dept = await adminService.updateDepartment(req.user!.id, id, name, status, req.requestId);
+    return successResponse(res, "Department updated successfully.", dept, 200);
+  } catch (error: any) {
+    return errorResponse(res, "Department update failed: " + error.message, 500);
+  }
+});
+
+export const getDepartmentStats = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  try {
+    const stats = await adminService.getDepartmentStats(req.user!.id, req.requestId);
+    return successResponse(res, "Department statistics retrieved.", stats, 200);
+  } catch (error: any) {
+    return errorResponse(res, "Failed to retrieve statistics.", 500);
+  }
+});
+
+export const getHospitalStaffList = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  try {
+    const staff = await adminService.getHospitalStaff(req.user!.id, req.requestId);
+    return successResponse(res, "Staff registry retrieved.", staff, 200);
+  } catch (error: any) {
+    return errorResponse(res, "Failed to load staff list.", 500);
+  }
+});
+
+export const registerStaffMember = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  try {
+    const user = await adminService.registerStaffUser(req.user!.id, req.body, req.requestId);
+    return successResponse(res, "Staff user registered successfully.", user, 201);
+  } catch (error: any) {
+    if (error.message.includes("Unique constraint")) {
+      return errorResponse(res, "Email or License/Employee ID already exists.", 400);
+    }
+    return errorResponse(res, "Failed to register staff: " + error.message, 500);
+  }
+});

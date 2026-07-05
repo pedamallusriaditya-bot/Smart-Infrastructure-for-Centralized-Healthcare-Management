@@ -214,6 +214,17 @@ export class LabService {
         }
     }
 
+    if (requestor.role === 'LAB_TECHNICIAN' && filter.hospitalId) {
+        where.labOrder.doctor = { department: { hospitalId: filter.hospitalId } };
+    }
+
+    if (requestor.role === 'ADMIN') {
+        const admin = await prisma.admin.findUnique({ where: { userId: requestor.id } });
+        if (admin) {
+            where.labOrder.doctor = { department: { hospitalId: admin.hospitalId } };
+        }
+    }
+
     const [reports, total] = await prisma.$transaction([
       prisma.labReport.findMany({ 
         where, 

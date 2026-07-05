@@ -16,6 +16,7 @@ import doctorRoutes from './modules/doctor/doctor.routes.js';
 import appointmentRoutes from './modules/appointment/appointment.routes.js';
 import emergencyRoutes from './modules/emergency/emergency.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
+import labRoutes from './modules/lab/lab.routes.js';
 
 // Global API Routes
 import apiRoutes from './routes/v1/api.routes.js';
@@ -85,9 +86,7 @@ app.use(`${API_PREFIX}/appointments`, appointmentRoutes);
 app.use(`${API_PREFIX}/emergencies`, emergencyRoutes);
 app.use(`${API_PREFIX}/admin`, adminRoutes);
 app.use(`${API_PREFIX}/timeline`, apiRoutes);
-
-
-
+app.use(`${API_PREFIX}/lab`, labRoutes);
 app.use(`${API_PREFIX}/hospitals`, hospitalRoutes);
 
 // 11. GLOBAL ERROR HANDLING MIDDLEWARE (Last item)

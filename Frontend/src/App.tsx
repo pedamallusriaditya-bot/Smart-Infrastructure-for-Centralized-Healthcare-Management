@@ -1,8 +1,21 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import Dashboard from './pages/patient/Dashboard'; // UPDATED TO USE DASHBOARD
+import Dashboard from './pages/patient/Dashboard';
+import MyRecords from './pages/patient/MyRecords';
+import Appointments from './pages/patient/Appointments';
 import { useAuth } from './context/AuthContext';
+import PatientLayout from './layouts/PatientLayout';
+import DoctorDashboard from './pages/doctor/DoctorDashboard';
+import LISDashboard from './pages/lab/LISDashboard';
+import AdminLayout from './layouts/AdminLayout';
+import AdminOverview from './pages/admin/AdminOverview';
+import DepartmentMgmt from './pages/admin/DepartmentMgmt';
+import StaffManagement from './pages/admin/StaffManagement';
+import DoctorApprovalQueue from './pages/admin/DoctorApprovalQueue';
+import AppointmentMgmt from './pages/admin/AppointmentMgmt';
+import EmergencyCommandCenter from './pages/admin/EmergencyCommandCenter';
+import SystemAuditLogs from './pages/admin/SystemAuditLogs';
 
 // Protected Route Logic
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
@@ -23,15 +36,57 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* THE REAL DASHBOARDS */}
+        {/* Patient section with shared layout */}
         <Route
-          path="/patient/dashboard"
+          path="/patient"
           element={
             <ProtectedRoute allowedRoles={['PATIENT']}>
-              <Dashboard /> {/* UPDATED TO USE DASHBOARD */}
+              <PatientLayout />
             </ProtectedRoute>
           }
+        >
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="my-records" element={<MyRecords />} />
+          <Route path="appointments" element={<Appointments />} />
+        </Route>
+
+        {/* Doctor section */}
+        <Route 
+          path="/doctor/dashboard" 
+          element={
+            <ProtectedRoute allowedRoles={['DOCTOR']}>
+              <DoctorDashboard />
+            </ProtectedRoute>
+          } 
         />
+
+        {/* Lab Technician section */}
+        <Route 
+          path="/lab/dashboard" 
+          element={
+            <ProtectedRoute allowedRoles={['LAB_TECHNICIAN']}>
+              <LISDashboard />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Admin section */}
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <AdminLayout />
+            </ProtectedRoute>
+          } 
+        >
+          <Route path="dashboard" element={<AdminOverview />} />
+          <Route path="departments" element={<DepartmentMgmt />} />
+          <Route path="staff" element={<StaffManagement />} />
+          <Route path="doctors-approval" element={<DoctorApprovalQueue />} />
+          <Route path="appointments" element={<AppointmentMgmt />} />
+          <Route path="emergency" element={<EmergencyCommandCenter />} />
+          <Route path="audit" element={<SystemAuditLogs />} />
+        </Route>
 
         {/* Root Redirect */}
         <Route path="/" element={<Navigate to="/login" replace />} />

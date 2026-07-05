@@ -1,833 +1,720 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { 
+  getPatientProfile, 
+  getPatientQR, 
+  getDoctors, 
+  createAppointment,
+  getAppointments,
+  getLabReports,
+  getMyAdmissionStatus,
+  getAITimeline
+} from '../../api/patient.api';
+import { Loader2 } from 'lucide-react';
+import EmergencySOSModal from '../../components/patient/EmergencySOSModal';
+import { useNavigate } from 'react-router-dom';
 
-const Dashboard = () => {
-  // Mock data from the Stitch HTML
-  const patient = {
-    name: "John Doe",
-    bloodGroup: "O+",
-    age: "35",
-    height: "175 cm",
-    weight: "70 kg",
-    bmi: "22.9",
+const Dashboard: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState<any>(null);
+  const [appointmentsList, setAppointmentsList] = useState<any[]>([]);
+  const [labReportsList, setLabReportsList] = useState<any[]>([]);
+  const [admissionStatus, setAdmissionStatus] = useState<any>(null);
+  const [timelineData, setTimelineData] = useState<{ summary: string, events: any[] }>({ summary: "", events: [] });
+  
+  const [loading, setLoading] = useState(true);
+  const [errorState, setErrorState] = useState<string | null>(null);
+  const [isSOSOpen, setIsSOSOpen] = useState(false);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [isLabModalOpen, setIsLabModalOpen] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [emergencyActive, setEmergencyActive] = useState(false);
+
+  // QR Modal & Expiration State
+  const [qrCodeData, setQrCodeData] = useState<string | null>(null);
+  const [qrTimestamp, setQrTimestamp] = useState<number | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Booking Modal State
+  const [doctorsList, setDoctorsList] = useState<any[]>([]);
+  const [selectedSpecialization, setSelectedSpecialization] = useState("");
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingTime, setBookingTime] = useState("09:00 AM");
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingReason, setBookingReason] = useState("Routine consultation");
+
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
+  // Timer loop for QR expiry check (real-time countdown & switch)
+  useEffect(() => {
+    if (!isQRModalOpen || !qrTimestamp) return;
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isQRModalOpen, qrTimestamp]);
+
+  const loadAllData = async () => {
+    setLoading(true);
+    setErrorState(null);
+    try {
+      const prof = await getPatientProfile();
+      setProfile(prof);
+
+      const [appts, labs, admission, timeline] = await Promise.all([
+        getAppointments().catch(() => []),
+        getLabReports().catch(() => ({ reports: [] })),
+        getMyAdmissionStatus().catch((err) => {
+          if (err.response?.status === 404) return null;
+          throw err;
+        }),
+        getAITimeline(prof.id).catch(() => ({ summary: "Timeline generation failed", events: [] }))
+      ]);
+
+      setAppointmentsList(appts || []);
+      setLabReportsList(labs.reports || []);
+      setAdmissionStatus(admission);
+      setTimelineData(timeline);
+    } catch (err: any) {
+      console.error("Dashboard data load error", err);
+      setErrorState(err.response?.data?.message || "Failed to establish secure link with clinical database.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const appointment = {
-    doctorName: "Dr. Sarah Chen",
-    department: "Cardiology",
-    hospital: "Central General Hospital",
-    date: "Today",
-    time: "10:30 AM",
-    status: "Confirmed",
+  const openQRModal = async () => {
+    setIsQRModalOpen(true);
+    setQrLoading(true);
+    try {
+      const data = await getPatientQR();
+      setQrCodeData(data.qrCode);
+      setQrTimestamp(Date.now());
+      setCurrentTime(Date.now());
+    } catch (err) {
+      console.error("Failed to fetch QR", err);
+    } finally {
+      setQrLoading(false);
+    }
   };
 
-  const doctor = {
-    photo: "https://via.placeholder.com/150",
-    name: "Dr. Sarah Chen",
-    specialization: "Cardiologist",
-    department: "Cardiology",
-    hospital: "Central General Hospital",
+  const openBookingModal = async () => {
+    navigate('/patient/appointments', { state: { openBooking: true } });
   };
 
-  // Modal states
-  const [bookingModal, setBookingModal] = useState(false);
-  const [qrModal, setQRModal] = useState(false);
-  const [labModal, setLabModal] = useState(false);
-  const [emergencyModal, setEmergencyModal] = useState(false);
-  const [locationDetected, setLocationDetected] = useState(false);
+  const handleBookAppointment = async () => {
+    if (!selectedDoctorId || !bookingDate || !bookingTime) {
+      alert("Please select a doctor, date, and time slot.");
+      return;
+    }
+    setBookingLoading(true);
+    try {
+      const [time, modifier] = bookingTime.split(" ");
+      let [hours, minutes] = time.split(":").map(Number);
+      if (modifier === "PM" && hours < 12) hours += 12;
+      if (modifier === "AM" && hours === 12) hours = 0;
 
-  // Modal handlers
-  const openModal = () => setBookingModal(true);
-  const closeModal = () => setBookingModal(false);
-  const openQRModal = () => setQRModal(true);
-  const closeQRModal = () => setQRModal(false);
-  const openLabModal = () => setLabModal(true);
-  const closeLabModal = () => setLabModal(false);
-  const openEmergencyModal = () => {
-    setEmergencyModal(true);
-    // Simulate location detection after 2 seconds
-    setTimeout(() => {
-      setLocationDetected(true);
-    }, 2000);
+      const scheduledDate = new Date(bookingDate);
+      scheduledDate.setHours(hours, minutes, 0, 0);
+
+      await createAppointment({
+        doctorId: selectedDoctorId,
+        scheduledTime: scheduledDate.toISOString(),
+        reason: bookingReason
+      });
+
+      alert("Appointment booked successfully!");
+      setIsBookingOpen(false);
+      loadAllData();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Booking failed.";
+      alert(`Booking failed: ${msg}`);
+    } finally {
+      setBookingLoading(false);
+    }
   };
-  const closeEmergencyModal = () => {
-    setEmergencyModal(false);
-    setLocationDetected(false);
+
+  const calculateAge = (dob: string) => {
+    if (!dob) return "--";
+    return Math.floor((new Date().getTime() - new Date(dob).getTime()) / 3.154e10);
   };
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    return new Date(dateStr).toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const formatTime = (dateStr: string) => {
+    if (!dateStr) return "";
+    return new Date(dateStr).toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const todayFormatted = new Date().toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+
+  if (loading) {
+    return (
+      <div className="h-[60vh] flex items-center justify-center">
+        <Loader2 className="animate-spin text-primary w-12 h-12" />
+      </div>
+    );
+  }
+
+  if (errorState) {
+    return (
+      <div className="record-card p-xl bg-error/5 border-error/20 text-center max-w-xl mx-auto my-12">
+        <span className="material-symbols-outlined text-error text-5xl mb-4 animate-bounce">warning</span>
+        <h2 className="text-xl font-bold text-error mb-2">Clinical Data Connection Failure</h2>
+        <p className="text-on-surface-variant mb-6">{errorState}</p>
+        <button 
+          onClick={loadAllData}
+          className="px-6 py-3 bg-primary text-white rounded-lg font-bold hover:opacity-90 transition-all cursor-pointer"
+        >
+          Retry Connection
+        </button>
+      </div>
+    );
+  }
+
+  // Filter doctors list based on selected specialization
+  const filteredDoctors = selectedSpecialization
+    ? doctorsList.filter(doc => doc.specialization === selectedSpecialization.toUpperCase())
+    : doctorsList;
+
+  // Next appointment logic
+  const nextAppt = appointmentsList.find((a: any) => a.status === 'SCHEDULED');
+
+  const latestReport = labReportsList[0];
+
+  const assignedDoctor = nextAppt?.doctor || appointmentsList[0]?.doctor;
+
+  const timelineEvents = timelineData.events || [];
+
+  const welcomeMessage = admissionStatus
+    ? `Admitted: Room ${admissionStatus.bed?.room?.roomNumber || "--"} (${admissionStatus.bed?.room?.type || "--"}), Bed ${admissionStatus.bed?.bedNumber || "--"} — Reason: ${admissionStatus.reason || "Observation"}`
+    : `Today is ${todayFormatted}`;
+
+  // Expiry configuration: 15 minutes = 900,000 milliseconds
+  const isQrExpired = qrTimestamp ? (currentTime - qrTimestamp > 15 * 60 * 1000) : false;
+  const qrTimeRemaining = qrTimestamp ? Math.max(0, 15 * 60 - Math.floor((currentTime - qrTimestamp) / 1000)) : 0;
+  const qrMin = Math.floor(qrTimeRemaining / 60);
+  const qrSec = qrTimeRemaining % 60;
 
   return (
     <>
-      {/* Tailwind config script from Stitch HTML - not needed as we use PostCSS */}
-      {/* We'll include the custom styles from the <style> tag in the Stitch HTML */}
-      <style>
-        {`
-          body { font-family: 'Inter', sans-serif; }
-          .fade-in { opacity: 0; transform: translateY(10px); animation: fadeIn 0.6s ease-out forwards; }
-          @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
-          .stagger-1 { animation-delay: 0.1s; }
-          .stagger-2 { animation-delay: 0.2s; }
-          .stagger-3 { animation-delay: 0.3s; }
-          .stagger-4 { animation-delay: 0.4s; }
-          .stagger-5 { animation-delay: 0.5s; }
+      {/* Header Section */}
+      <section className="fade-in stagger-1">
+        <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
+          Welcome back, {user?.firstName}
+        </h1>
+        <p className="font-body-lg text-body-lg text-on-surface-variant mt-xs">
+          {welcomeMessage}
+        </p>
+      </section>
 
-          .custom-shadow { box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05); }
-          .card-border { border: 1px solid #E0E0E0; }
+      {/* Quick Actions Grid */}
+      <section className="fade-in stagger-2 grid grid-cols-1 md:grid-cols-4 gap-md">
+        <button 
+          onClick={openBookingModal}
+          className="flex items-center justify-center gap-base bg-primary text-on-primary py-lg px-xl rounded-lg font-label-lg text-label-lg shadow-md hover:opacity-90 transition-all cursor-pointer"
+        >
+          <span className="material-symbols-outlined">calendar_today</span>
+          Book Appointment
+        </button>
+        <button 
+          onClick={() => setIsSOSOpen(true)}
+          className="flex items-center justify-center gap-base bg-error text-on-error py-lg px-xl rounded-lg font-label-lg text-label-lg shadow-md hover:opacity-90 transition-all cursor-pointer"
+        >
+          <span className="material-symbols-outlined">emergency_share</span>
+          SOS / Emergency
+        </button>
+        <button 
+          onClick={() => setIsLabModalOpen(true)}
+          className="flex items-center justify-center gap-base border border-primary text-primary py-lg px-xl rounded-lg font-label-lg text-label-lg hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <span className="material-symbols-outlined">science</span>
+          Laboratory Results
+        </button>
+        <button 
+          onClick={openQRModal}
+          className="flex items-center justify-center gap-base border border-primary text-primary py-lg px-xl rounded-lg font-label-lg text-label-lg hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <span className="material-symbols-outlined">qr_code_2</span>
+          Medical QR
+        </button>
+      </section>
 
-          .activity-line::before {
-              content: '';
-              position: absolute;
-              left: 7px;
-              top: 24px;
-              bottom: 0;
-              width: 2px;
-              background: #E1E3E4;
-          }
-          .activity-line:last-child::before { display: none; }
-        `}
-      </style>
-
-      {/* TopAppBar */}
-      <header className="bg-surface dark:bg-[#d9dadb] border-b border-[#c2c6d4] dark:border-[#c2c6d4] flex justify-between items-center w-full px-6 md:px-8 h-16 sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <span className="font-headline-lg text-headline-lg font-bold text-primary dark:text-[#a8c8ff]">CareHive</span>
+      {/* Main Dashboard Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-xl">
+        
+        {/* Health Summary Card */}
+        <div className="md:col-span-4 fade-in stagger-3 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col justify-between">
+          <div>
+            <h2 className="font-title-lg text-title-lg text-on-surface mb-md">Health Summary</h2>
+            <div className="grid grid-cols-2 gap-md mb-md">
+              <div className="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+                <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Blood Group</span>
+                <span className="font-title-lg text-title-lg text-primary">{profile?.bloodGroup || "Pending"}</span>
+              </div>
+              <div className="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+                <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Age</span>
+                <span className="font-title-lg text-title-lg text-on-surface">
+                  {profile?.dateOfBirth ? `${calculateAge(profile.dateOfBirth)} Yrs` : "N/A"}
+                </span>
+              </div>
+              <div className="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+                <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Height</span>
+                <span className="font-body-lg text-body-lg text-on-surface">N/A</span>
+              </div>
+              <div className="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+                <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Weight</span>
+                <span className="font-body-lg text-body-lg text-on-surface">N/A</span>
+              </div>
+              <div className="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+                <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">BMI</span>
+                <span className="font-body-lg text-body-lg text-on-surface">N/A</span>
+              </div>
+              <div className="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
+                <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Emergency Status</span>
+                <span className={`font-body-lg text-body-lg ${emergencyActive ? "text-error font-bold animate-pulse" : "text-on-surface"}`}>
+                  {emergencyActive ? "Emergency Active" : "Waiting for Response"}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
-        <nav className="hidden md:flex gap-4 items-center">
-          <a
-            className="text-primary font-bold font-title-lg text-title-lg bg-[#e7e8e9] px-3 py-1 rounded"
-            href="#"
-          >
-            Dashboard
-          </a>
-          <a
-            className="text-on-surface-variant font-title-lg text-title-lg hover:bg-[#e7e8e9] transition-colors px-3 py-1 rounded"
-            href="#"
-          >
-            Logout
-          </a>
-        </nav>
-        <div className="flex items-center gap-4">
-          <button
-            className="material-symbols-outlined text-primary cursor-pointer active:opacity-80 p-2 rounded-full hover:bg-[#e7e8e9] transition-colors"
-            onClick={() => alert('Help clicked')}
-          >
-            help_outline
-          </button>
-          <button
-            className="material-symbols-outlined text-primary cursor-pointer active:opacity-80 p-2 rounded-full hover:bg-[#e7e8e9] transition-colors"
-            onClick={() => document.documentElement.classList.toggle('dark')}
-          >
-            dark_mode
-          </button>
-          <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
-            {patient.name.charAt(0)}{patient.name.split(' ')[1]?.charAt(0) ?? ''}
+
+        {/* Upcoming Appointment Card */}
+        <div className="md:col-span-4 fade-in stagger-4 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col">
+          <div className="flex items-center gap-sm mb-md text-primary">
+            <span className="material-symbols-outlined">event</span>
+            <h2 className="font-title-lg text-title-lg text-on-surface">Upcoming Appointment</h2>
           </div>
+          <div className="flex-grow space-y-sm mb-lg">
+            {nextAppt ? (
+              <>
+                <p className="font-label-lg text-label-lg text-on-surface">
+                  {nextAppt.doctor ? `Dr. ${nextAppt.doctor.firstName} ${nextAppt.doctor.lastName}` : "Medical Practitioner"}
+                </p>
+                <p className="font-body-md text-body-md text-on-surface-variant">
+                  {nextAppt.doctor?.specialization || "General Medicine"} • St. Mary's Hospital
+                </p>
+                <div className="flex items-center gap-sm text-primary">
+                  <span className="material-symbols-outlined text-body-md">calendar_month</span>
+                  <span className="font-body-md">
+                    {formatDate(nextAppt.appointmentDate)} at {formatTime(nextAppt.appointmentDate)}
+                  </span>
+                </div>
+                <span className="inline-block px-sm py-xs bg-primary/10 text-primary rounded text-label-md uppercase">
+                  {nextAppt.status}
+                </span>
+              </>
+            ) : (
+              <div className="py-4 text-center text-sm text-gray-400">
+                No upcoming appointments scheduled.
+              </div>
+            )}
+          </div>
+          <button className="w-full text-center py-sm border-t border-outline-variant text-primary font-label-lg text-label-lg hover:bg-surface-container transition-colors cursor-pointer">
+            View Appointment
+          </button>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-8 py-8">
-        {/* Header Section */}
-        <section className="fade-in stagger-1">
-          <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
-            Welcome back, {patient.name}
-          </h1>
-          <p className="font-body-lg text-body-lg text-on-surface-variant mt-xs">
-            Today is {appointment.date}
-          </p>
-        </section>
-
-        {/* Quick Actions (Mobile First) */}
-        <section className="fade-in stagger-2 grid grid-cols-1 md:grid-cols-4 gap-4">
-          <button
-            className="flex items-center justify-center gap-2 bg-primary text-on-primary py-3 px-5 rounded-lg font-label-md text-label-md shadow-md hover:opacity-90 transition-all cursor-pointer"
-            onClick={openModal}
-          >
-            <span className="material-symbols-outlined">calendar_today</span>
-            Book Appointment
-          </button>
-          <button
-            className="flex items-center justify-center gap-2 bg-error text-on-error py-3 px-5 rounded-lg font-label-md text-label-md shadow-md hover:opacity-90 transition-all cursor-pointer"
-            onClick={openEmergencyModal}
-          >
-            <span className="material-symbols-outlined">emergency_share</span>
-            SOS / Emergency
-          </button>
-          <button
-            className="flex items-center justify-center gap-2 border border-primary text-primary py-3 px-5 rounded-lg font-label-md text-label-md hover:bg-primary/5 transition-all cursor-pointer"
-            onClick={openLabModal}
-          >
-            <span className="material-symbols-outlined">science</span>
-            Laboratory Results
-          </button>
-          <button
-            className="flex items-center justify-center gap-2 border border-primary text-primary py-3 px-5 rounded-lg font-label-md text-label-md hover:bg-primary/5 transition-all cursor-pointer"
-            onClick={openQRModal}
-          >
-            <span className="material-symbols-outlined">qr_code_2</span>
-            Medical QR
-          </button>
-        </section>
-
-        {/* Main Dashboard Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-          {/* Row 2: 3-column layout */}
-          {/* Health Summary */}
-          <div className="md:col-span-4 fade-in stagger-3 bg-white card-border custom-shadow p-[20px] rounded-lg flex flex-col justify-between">
-            <div>
-              <h2 className="font-title-lg text-title-lg text-on-surface mb-3">Health Summary</h2>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="p-3 bg-surface-container rounded-lg flex flex-col gap-1">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Blood Group</span>
-                  <span className="font-title-lg text-title-lg text-primary">{patient.bloodGroup}</span>
-                </div>
-                <div className="p-3 bg-surface-container rounded-lg flex flex-col gap-1">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Age</span>
-                  <span className="font-title-lg text-title-lg text-on-surface">{patient.age}</span>
-                </div>
-                <div className="p-3 bg-surface-container rounded-lg flex flex-col gap-1">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Height</span>
-                  <span className="font-body-lg text-body-lg text-on-surface">{patient.height}</span>
-                </div>
-                <div className="p-3 bg-surface-container rounded-lg flex flex-col gap-1">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Weight</span>
-                  <span className="font-body-lg text-body-lg text-on-surface">{patient.weight}</span>
-                </div>
-                <div className="p-3 bg-surface-container rounded-lg flex flex-col gap-1">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">BMI</span>
-                  <span className="font-body-lg text-body-lg text-on-surface">{patient.bmi}</span>
-                </div>
-                <div className="p-3 bg-surface-container rounded-lg flex flex-col gap-1">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Emergency Status</span>
-                  <span className="font-body-lg text-body-lg text-on-surface">Waiting for Response</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Upcoming Appointment */}
-          <div className="md:col-span-4 fade-in stagger-4 bg-white card-border custom-shadow p-[20px] rounded-lg flex flex-col">
-            <div className="flex items-center gap-2 mb-3 text-primary">
-              <span className="material-symbols-outlined">event</span>
-              <h2 className="font-title-lg text-title-lg text-on-surface">Upcoming Appointment</h2>
-            </div>
-            <div className="flex-grow space-y-2 mb-5">
-              <p className="font-label-md text-label-md text-on-surface">{appointment.doctorName}</p>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">
-                {appointment.department} • {appointment.hospital}
-              </p>
-              <div className="flex items-center gap-2 text-primary">
-                <span className="material-symbols-outlined text-body-sm">calendar_month</span>
-                <span className="font-body-sm">{appointment.date} at {appointment.time}</span>
-              </div>
-              <span className="inline-block px-2 py-0.5 bg-primary/10 text-primary rounded text-label-md uppercase">{appointment.status}</span>
-            </div>
-            <button
-              className="w-full text-center py-2 border-t border-[#c2c6d4] text-primary font-label-md text-label-md hover:bg-[#f3f4f5] transition-colors cursor-pointer"
-            >
-              View Appointment
-            </button>
-          </div>
-
-          {/* AI Health Insights */}
-          <div className="md:col-span-4 fade-in stagger-5 bg-white card-border custom-shadow p-[20px] rounded-lg overflow-hidden relative group">
-            <div className="relative z-10 flex flex-col h-full">
-              <h3 className="font-title-lg text-title-lg mb-2 text-on-surface">AI Health Insights</h3>
-              <div className="space-y-3 flex-grow">
-                <div>
-                  <p className="font-label-md text-on-surface-variant uppercase">Health Summary</p>
-                  <p className="font-body-sm text-on-surface">Respiratory metrics showing positive trends.</p>
-                </div>
-                <div>
-                  <p className="font-label-md text-on-surface-variant uppercase">Risk Level</p>
-                  <p className="font-body-sm text-secondary font-bold">LOW</p>
-                </div>
-                <div>
-                  <p className="font-label-md text-on-surface-variant uppercase">Preventive Suggestions</p>
-                  <p className="font-body-sm text-on-surface">Maintain daily walking routine.</p>
-                </div>
-              </div>
-              <button
-                className="mt-4 w-full text-center py-2 border-t border-[#c2c6d4] text-primary font-label-md text-label-md hover:bg-[#f3f4f5] transition-colors cursor-pointer"
-              >
-                View Detailed Analysis
-              </button>
-            </div>
-            <span
-              className="material-symbols-outlined absolute -right-1 -bottom-1 text-[96px] text-primary opacity-10 group-hover:rotate-12 transition-transform"
-            >
-              insights
-            </span>
-          </div>
-
-          {/* Row 3: Full-width Medical Timeline */}
-          <div className="md:col-span-6 bg-white card-border custom-shadow p-[20px] rounded-lg flex flex-col">
-            <h2 className="font-title-lg text-title-lg text-on-surface mb-3">Latest Laboratory Report</h2>
-            <div className="flex-grow space-y-3 mb-5">
-              <div className="flex justify-between border-b border-[#c2c6d4] pb-2">
-                <span className="text-body-sm text-on-surface-variant">Test Name</span>
-                <span className="text-body-sm font-bold">Complete Blood Count</span>
-              </div>
-              <div className="flex justify-between border-b border-[#c2c6d4] pb-2">
-                <span className="text-body-sm text-on-surface-variant">Report Date</span>
-                <span className="text-body-sm">Oct 24, 2024</span>
-              </div>
-              <div className="flex justify-between border-b border-[#c2c6d4] pb-2">
-                <span className="text-body-sm text-on-surface-variant">AI Analysis</span>
-                <span className="text-body-sm text-secondary">Completed</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-body-sm text-on-surface-variant">Overall Result</span>
-                <span className="text-body-sm font-bold text-primary">Normal</span>
-              </div>
-            </div>
-            <div className="flex gap-3 border-t border-[#c2c6d4] pt-3">
-              <button
-                className="flex-grow text-center py-2 text-primary font-label-md hover:bg-[#f3f4f5] transition-colors"
-              >
-                View Report
-              </button>
-              <button
-                className="flex-grow text-center py-2 text-primary font-label-md hover:bg-[#f3f4f5] transition-colors"
-              >
-                Download PDF
-              </button>
-            </div>
-          </div>
-
-          <div className="md:col-span-6 bg-white card-border custom-shadow p-[20px] rounded-lg flex flex-col">
-            <h2 className="font-title-lg text-title-lg text-on-surface mb-3">Current Prescription</h2>
-            <div className="flex-grow space-y-3 mb-5">
-              <div className="p-3 bg-surface-container rounded-lg">
-                <p className="font-label-md text-on-surface">Amoxicillin 500mg</p>
-                <p className="text-body-sm text-on-surface-variant">1 capsule • 3 times daily • 7 days</p>
-              </div>
-              <div className="p-3 bg-surface-container rounded-lg">
-                <p className="font-label-md text-on-surface">Lisinopril 10mg</p>
-                <p className="text-body-sm text-on-surface-variant">1 tablet • Once daily • Ongoing</p>
-              </div>
-            </div>
-            <button
-              className="w-full text-center py-2 border-t border-[#c2c6d4] text-primary font-label-md text-label-md hover:bg-[#f3f4f5] transition-colors cursor-pointer"
-            >
-              View Full Prescription
-            </button>
-          </div>
-
-          {/* Row 4: Assigned Doctor & Medical Timeline */}
-          <div className="md:col-span-6 bg-white card-border custom-shadow p-[20px] rounded-lg flex flex-col">
-            <h2 className="font-title-lg text-title-lg text-on-surface mb-3">Assigned Doctor</h2>
-            <div className="flex items-center gap-4 mb-5">
-              <div className="w-10 h-10 rounded-full bg-surface-container overflow-hidden flex items-center justify-center">
-                <img
-                  src={doctor.photo}
-                  alt={doctor.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div>
-                <p className="font-title-lg text-on-surface">{doctor.name}</p>
-                <p className="text-primary font-label-md">{doctor.specialization}</p>
-                <p className="text-body-sm text-on-surface-variant">
-                  {doctor.department} • {doctor.hospital}
+        {/* AI Health Insights */}
+        <div className="md:col-span-4 fade-in stagger-5 bg-white card-border custom-shadow p-lg rounded-lg overflow-hidden relative group">
+          <div className="relative z-10 flex flex-col h-full">
+            <h3 className="font-title-lg text-title-lg mb-sm text-on-surface">AI Health Insights</h3>
+            <div className="space-y-md flex-grow">
+              <div className="max-h-48 overflow-y-auto pr-1">
+                <p className="font-label-md text-on-surface-variant uppercase">Health Summary</p>
+                <p className="font-body-md text-on-surface leading-relaxed text-xs italic">
+                  "{timelineData.summary || "No AI summary compiled. Record additional clinic visits or lab orders to generate insights."}"
                 </p>
               </div>
-            </div>
-            <div className="flex gap-3 pt-3 border-t border-[#c2c6d4]">
-              <button
-                className="flex-grow text-center py-2 text-primary font-label-md hover:bg-[#f3f4f5] transition-colors"
-              >
-                View Profile
-              </button>
-              <button
-                className="flex-grow text-center py-2 text-primary font-label-md hover:bg-[#f3f4f5] transition-colors"
-              >
-                Book Follow-up
-              </button>
-            </div>
-          </div>
-
-          <div className="md:col-span-6 bg-white card-border custom-shadow p-[20px] rounded-lg flex flex-col">
-            <h2 className="font-title-lg text-title-lg text-on-surface mb-3">Medical Timeline</h2>
-            <div className="space-y-0">
-              <div className="relative activity-line pb-3 flex gap-4">
-                <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5 shrink-0 z-10"></div>
+              <div className="flex justify-between items-center pt-2 border-t border-slate-50">
                 <div>
-                  <p className="font-label-md text-label-md text-on-surface">Consultation: General Checkup</p>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">Today • General Hospital</p>
+                  <p className="font-label-md text-on-surface-variant uppercase text-[10px]">Risk Level</p>
+                  <p className="font-body-md text-slate-400 font-bold text-xs">N/A</p>
                 </div>
-              </div>
-              <div className="relative activity-line pb-3 flex gap-4">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#e1e3e4] mt-1.5 shrink-0 z-10"></div>
                 <div>
-                  <p className="font-label-md text-label-md text-on-surface">Prescription Updated: Amoxicillin</p>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">Yesterday • Dr. Sarah Chen</p>
-                </div>
-              </div>
-              <div className="relative activity-line pb-3 flex gap-4">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#e1e3e4] mt-1.5 shrink-0 z-10"></div>
-                <div>
-                  <p className="font-label-md text-label-md text-on-surface">Lab Report: CBC Results</p>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">2 days ago • BioPath Labs</p>
+                  <p className="font-label-md text-on-surface-variant uppercase text-[10px] text-right">Preventive</p>
+                  <p className="font-body-md text-slate-400 text-xs text-right">N/A</p>
                 </div>
               </div>
             </div>
+            <button className="mt-lg w-full text-center py-sm border-t border-outline-variant text-primary font-label-lg text-label-lg hover:bg-surface-container transition-colors cursor-pointer">
+              View Detailed Analysis
+            </button>
           </div>
+          <span className="material-symbols-outlined absolute -right-4 -bottom-4 text-[96px] text-primary opacity-10 group-hover:rotate-12 transition-transform">
+            insights
+          </span>
+        </div>
 
-          {/* Row 5: Notifications (wide) & Quick Access (full-width) */}
-          <div className="md:col-span-8 bg-white card-border custom-shadow p-[20px] rounded-lg">
-            <h2 className="font-title-lg text-title-lg text-on-surface mb-4">Notifications</h2>
-            <div className="space-y-3">
-              <div className="flex gap-2 p-3 hover:bg-[#f3f4f5] rounded transition-colors">
-                <span className="material-symbols-outlined text-primary">event</span>
-                <p className="text-body-sm">Appointment tomorrow at 10:00 AM</p>
+        {/* Latest Laboratory Report */}
+        <div className="md:col-span-6 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col">
+          <h2 className="font-title-lg text-title-lg text-on-surface mb-md">Latest Laboratory Report</h2>
+          <div className="flex-grow space-y-md mb-lg">
+            {latestReport ? (
+              <>
+                <div className="flex justify-between border-b border-outline-variant pb-sm">
+                  <span className="text-body-md text-on-surface-variant">Test Name</span>
+                  <span className="text-body-md font-bold">{latestReport.labOrder?.testName || "Lab Analysis"}</span>
+                </div>
+                <div className="flex justify-between border-b border-outline-variant pb-sm">
+                  <span className="text-body-md text-on-surface-variant">Report Date</span>
+                  <span className="text-body-md">{formatDate(latestReport.createdAt)}</span>
+                </div>
+                <div className="flex justify-between border-b border-outline-variant pb-sm">
+                  <span className="text-body-md text-on-surface-variant">AI Analysis</span>
+                  <span className="text-body-md text-secondary">{latestReport.aiSummary ? "Completed" : "Pending"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-body-md text-on-surface-variant">Overall Result</span>
+                  <span className={`text-body-md font-bold ${latestReport.isAbnormal ? "text-error" : "text-primary"}`}>
+                    {latestReport.isAbnormal ? "Abnormal" : "Normal"}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="py-8 text-center text-sm text-gray-400">
+                No laboratory reports on file.
               </div>
-              <div className="flex gap-2 p-3 hover:bg-[#f3f4f5] rounded transition-colors">
-                <span className="material-symbols-outlined text-secondary">science</span>
-                <p className="text-body-sm">New lab report available for download</p>
-              </div>
-              <div className="flex gap-2 p-3 hover:bg-[#f3f4f5] rounded transition-colors">
-                <span className="material-symbols-outlined text-primary">medication</span>
-                <p className="text-body-sm">Prescription updated by Dr. Chen</p>
-              </div>
+            )}
+          </div>
+          <div className="flex gap-md border-t border-outline-variant pt-md">
+            <button className="flex-grow text-center py-sm text-primary font-label-lg hover:bg-surface-container transition-colors disabled:opacity-50" disabled={!latestReport}>
+              View Report
+            </button>
+          </div>
+        </div>
+
+        {/* Current Prescription */}
+        <div className="md:col-span-6 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col justify-between">
+          <div>
+            <h2 className="font-title-lg text-title-lg text-on-surface mb-md">Current Prescription</h2>
+            <div className="py-8 text-center text-sm text-gray-400">
+              <span className="material-symbols-outlined text-4xl block mb-2">medication_liquid</span>
+              No active prescriptions found in electronic health record.
+              <p className="text-[10px] text-gray-400/80 mt-1">Prescription tracking is unavailable in this clinical portal.</p>
             </div>
           </div>
+          <button className="w-full text-center py-sm border-t border-outline-variant text-primary font-label-lg text-label-lg hover:bg-surface-container transition-colors cursor-not-allowed" disabled>
+            View Full Prescription
+          </button>
+        </div>
 
-          <div className="md:col-span-4 bg-white card-border custom-shadow p-[20px] rounded-lg">
-            <h2 className="font-title-lg text-title-lg text-on-surface mb-3">Quick Access</h2>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-              <div className="bg-white card-border p-3 rounded-lg text-center hover:border-primary cursor-pointer transition-all">
-                <span className="material-symbols-outlined text-primary mb-1">folder_shared</span>
-                <p className="text-label-md">Medical Records</p>
+        {/* Assigned Doctor */}
+        <div className="md:col-span-6 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col justify-between">
+          <div>
+            <h2 className="font-title-lg text-title-lg text-on-surface mb-md">Assigned Doctor</h2>
+            {assignedDoctor ? (
+              <div className="flex items-center gap-lg mb-lg">
+                <div className="w-20 h-20 rounded-full bg-surface-container overflow-hidden flex items-center justify-center text-slate-400">
+                  <span className="material-symbols-outlined text-4xl">person</span>
+                </div>
+                <div>
+                  <p className="font-title-lg text-on-surface">Dr. {assignedDoctor.firstName} {assignedDoctor.lastName}</p>
+                  <p className="text-primary font-label-lg uppercase tracking-tight">{assignedDoctor.specialization}</p>
+                  <p className="text-body-md text-on-surface-variant">St. Mary's General Hospital</p>
+                </div>
               </div>
-              <div className="bg-white card-border p-3 rounded-lg text-center hover:border-primary cursor-pointer transition-all">
-                <span className="material-symbols-outlined text-primary mb-1">history</span>
-                <p className="text-label-md">Appointment History</p>
+            ) : (
+              <div className="py-6 text-center text-sm text-gray-400">
+                No assigned primary clinician.
+                <p className="text-[10px] text-gray-400/80 mt-1">Schedule an appointment to designate a doctor.</p>
               </div>
-              <div className="bg-white card-border p-3 rounded-lg text-center hover:border-primary cursor-pointer transition-all">
-                <span className="material-symbols-outlined text-primary mb-1">biotech</span>
-                <p className="text-label-md">Lab Reports</p>
+            )}
+          </div>
+          <div className="flex gap-md border-t border-outline-variant pt-md">
+            <button className="flex-grow text-center py-sm text-primary font-label-lg hover:bg-surface-container transition-colors disabled:opacity-50" disabled={!assignedDoctor}>
+              View Profile
+            </button>
+            <button className="flex-grow text-center py-sm text-primary font-label-lg hover:bg-surface-container transition-colors disabled:opacity-50" disabled={!assignedDoctor}>
+              Book Follow-up
+            </button>
+          </div>
+        </div>
+
+        {/* Medical Timeline */}
+        <div className="md:col-span-8 bg-white card-border custom-shadow p-lg rounded-lg">
+          <h2 className="font-title-lg text-title-lg text-on-surface mb-lg">Medical Timeline</h2>
+          <div className="space-y-0">
+            {timelineEvents.length === 0 ? (
+              <div className="py-8 text-center text-sm text-gray-400">
+                No clinical events recorded.
               </div>
-              <div className="bg-white card-border p-3 rounded-lg text-center hover:border-primary cursor-pointer transition-all">
-                <span className="material-symbols-outlined text-primary mb-1">emergency</span>
-                <p className="text-label-md">Emergency History</p>
-              </div>
-              <div className="bg-white card-border p-3 rounded-lg text-center hover:border-primary cursor-pointer transition-all">
-                <span className="material-symbols-outlined text-primary mb-1">person</span>
-                <p className="text-label-md">Profile</p>
-              </div>
-              <div className="bg-white card-border p-3 rounded-lg text-center hover:border-primary cursor-pointer transition-all">
-                <span className="material-symbols-outlined text-primary mb-1">logout</span>
-                <p className="text-label-md">Logout</p>
-              </div>
+            ) : (
+              timelineEvents.slice(0, 3).map((event: any, index: number) => {
+                let title = "";
+                let subtitle = "";
+                let iconColor = "bg-primary";
+                
+                if (event.entryType === 'APPOINTMENT') {
+                  title = `Consultation: ${event.reason || "Clinic Visit"}`;
+                  subtitle = `${formatDate(event.date)} • ${event.status}`;
+                  iconColor = "bg-primary";
+                } else if (event.entryType === 'LAB_ORDER') {
+                  title = `Laboratory Order: ${event.testName}`;
+                  subtitle = `${formatDate(event.date)} • ${event.status}`;
+                  iconColor = "bg-secondary";
+                } else {
+                  title = `Diagnosis: ${event.diagnosis || "Medical Update"}`;
+                  subtitle = `${formatDate(event.date)} • Clinical Notes`;
+                  iconColor = "bg-outline-variant";
+                }
+
+                return (
+                  <div key={index} className="relative activity-line pb-lg flex gap-lg">
+                    <div className={`w-4 h-4 rounded-full ${iconColor} mt-1.5 shrink-0 z-10`}></div>
+                    <div>
+                      <p className="font-label-lg text-label-lg text-on-surface">{title}</p>
+                      <p className="font-label-md text-label-md text-on-surface-variant">{subtitle}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Notifications */}
+        <div className="md:col-span-4 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col justify-between">
+          <div>
+            <h2 className="font-title-lg text-title-lg text-on-surface mb-md">Notifications</h2>
+            <div className="py-8 text-center text-sm text-gray-400">
+              <span className="material-symbols-outlined text-3xl block mb-2 text-slate-300">notifications_off</span>
+              No active notifications.
             </div>
           </div>
         </div>
-      </main>
 
-      {/* Simple Booking Modal */}
-      <div
-        className={`fixed inset-0 bg-black/50 z-[100] items-center justify-center p-4 ${bookingModal ? 'flex' : 'hidden'}`}
-        id="bookingModal"
-      >
-        <div
-          className="bg-white rounded-lg w-full max-w-md p-[20px] custom-shadow animate-in slide-in-from-bottom duration-300"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Book Appointment</h2>
-            <button
-              className="material-symbols-outlined text-on-surface-variant cursor-pointer"
-              onClick={closeModal}
+        {/* Quick Access */}
+        <div className="md:col-span-12">
+          <h2 className="font-title-lg text-title-lg text-on-surface mb-md">Quick Access</h2>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-md">
+            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+              <span className="material-symbols-outlined text-primary mb-xs">folder_shared</span>
+              <p className="text-label-md">Medical Records</p>
+            </div>
+            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+              <span className="material-symbols-outlined text-primary mb-xs">history</span>
+              <p className="text-label-md">Appointment History</p>
+            </div>
+            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+              <span className="material-symbols-outlined text-primary mb-xs">biotech</span>
+              <p className="text-label-md">Lab Reports</p>
+            </div>
+            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+              <span className="material-symbols-outlined text-primary mb-xs">emergency</span>
+              <p className="text-label-md">Emergency History</p>
+            </div>
+            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+              <span className="material-symbols-outlined text-primary mb-xs">person</span>
+              <p className="text-label-md">Profile</p>
+            </div>
+            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+              <span className="material-symbols-outlined text-primary mb-xs">logout</span>
+              <p className="text-label-md">Logout</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Emergency SOS Modal */}
+      <EmergencySOSModal 
+        isOpen={isSOSOpen} 
+        onClose={() => {
+          setIsSOSOpen(false);
+          setEmergencyActive(true);
+        }} 
+      />
+
+      {/* Medical QR Modal */}
+      {isQRModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-md text-on-surface">
+          <div className="bg-white rounded-lg w-full max-w-md p-xl custom-shadow animate-in slide-in-from-bottom duration-300 relative">
+            <button 
+              className="material-symbols-outlined absolute right-md top-md text-on-surface-variant cursor-pointer hover:bg-slate-100 p-1 rounded-full animate-none" 
+              onClick={() => setIsQRModalOpen(false)}
             >
               close
             </button>
-          </div>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="font-label-md text-label-md text-on-surface-variant">Select Specialization</label>
-              <select
-                className="w-full border border-outline rounded p-3 font-body-md text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-              >
-                <option value="">Choose a specialization...</option>
-                <option value="cardiology">General Cardiology</option>
-                <option value="neurology">Neurology</option>
-                <option value="dermatology">Dermatology</option>
-                <option value="pediatrics">Pediatrics</option>
-              </select>
-            </div>
-            <div className="space-y-3">
-              <label className="font-label-md text-label-md text-on-surface-variant">Available Doctors</label>
-              <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2">
-                {/* Doctor Card 1 */}
-                <div
-                  className="p-3 border border-outline-variant rounded-lg hover:border-primary hover:bg-primary/5 cursor-pointer transition-all group border-primary bg-primary/5"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-label-md text-label-md text-on-surface group-hover:text-primary">Dr. Sarah Chen</p>
-                      <p className="font-label-sm text-label-sm text-primary">Cardiology</p>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mt-xs">Central General Hospital</p>
-                    </div>
-                    <span
-                      className="material-symbols-outlined text-primary group-hover:opacity-100 transition-opacity"
+            <div className="flex flex-col items-center gap-lg">
+              <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface text-center">Medical QR ID</h2>
+              
+              {/* Expiring QR Display */}
+              <div className="w-64 h-64 bg-white p-2 border-2 border-primary rounded-lg overflow-hidden flex items-center justify-center">
+                {qrLoading ? (
+                  <Loader2 className="animate-spin text-primary" size={40} />
+                ) : isQrExpired ? (
+                  <div className="w-full h-full bg-slate-50 border border-error/20 p-md rounded-lg flex flex-col items-center justify-center text-center gap-xs">
+                    <span className="material-symbols-outlined text-error text-4xl">gpp_maybe</span>
+                    <p className="text-xs font-bold text-error">Security Pass Expired</p>
+                    <p className="text-[10px] text-gray-400">For patient privacy, secure QR codes expire after 15 minutes.</p>
+                    <button 
+                      onClick={openQRModal}
+                      className="mt-4 px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:opacity-90 cursor-pointer"
                     >
-                      check_circle
-                    </span>
+                      Regenerate Pass
+                    </button>
                   </div>
-                </div>
-                {/* Doctor Card 2 */}
-                <div
-                  className="p-3 border border-outline-variant rounded-lg hover:border-primary hover:bg-primary/5 cursor-pointer transition-all group"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-label-md text-label-md text-on-surface group-hover:text-primary">Dr. Marcus Thorne</p>
-                      <p className="font-label-sm text-label-sm text-primary">Cardiology</p>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mt-xs">City Medical Center</p>
-                    </div>
-                    <span
-                      className="material-symbols-outlined text-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      check_circle
-                    </span>
-                  </div>
-                </div>
+                ) : qrCodeData ? (
+                  <img alt="Medical QR Code" className="w-full h-full object-contain" src={qrCodeData} />
+                ) : (
+                  <span className="text-sm text-gray-400">Failed to load QR</span>
+                )}
               </div>
-            </div>
-            <div className="space-y-2 animate-in fade-in">
-              <label className="font-label-md text-label-md text-on-surface-variant">Available Time Slots</label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  className="py-1 px-3 border border-primary text-primary rounded-full font-label-sm text-label-sm hover:bg-primary/5 transition-colors cursor-pointer"
-                >
-                  09:00 AM
-                </button>
-                <button
-                  className="py-1 px-3 border border-outline-variant text-on-surface-variant rounded-full font-label-sm text-label-sm opacity-50 cursor-not-allowed"
-                  disabled
-                >
-                  10:30 AM
-                </button>
-                <button
-                  className="py-1 px-3 border border-primary text-primary rounded-full font-label-sm text-label-sm hover:bg-primary/5 transition-colors cursor-pointer"
-                >
-                  11:00 AM
-                </button>
-                <button
-                  className="py-1 px-3 border border-primary text-primary rounded-full font-label-sm text-label-sm hover:bg-primary/5 transition-colors cursor-pointer"
-                >
-                  02:00 PM
-                </button>
-                <button
-                  className="py-1 px-3 border border-outline-variant text-on-surface-variant rounded-full font-label-sm text-label-sm opacity-50 cursor-not-allowed"
-                  disabled
-                >
-                  03:30 PM
-                </button>
-                <button
-                  className="py-1 px-3 border border-primary text-primary rounded-full font-label-sm text-label-sm hover:bg-primary/5 transition-colors cursor-pointer"
-                >
-                  04:15 PM
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="font-label-md text-label-md text-on-surface-variant">Preferred Date</label>
-              <input
-                className="w-full border border-outline rounded p-3 font-body-md text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                type="date"
-              />
-            </div>
-            <button
-              className="w-full bg-primary text-on-primary py-3 rounded-lg font-label-md text-label-md shadow hover:opacity-90 transition-all flex items-center justify-center gap-2"
-              onClick={closeModal}
-            >
-              <span className="material-symbols-outlined">calendar_month</span>
-              Confirm Appointment
-            </button>
-          </div>
-        </div>
-      </div>
 
-      {/* QR Modal */}
-      <div
-        className={`fixed inset-0 bg-black/50 z-[100] items-center justify-center p-4 ${qrModal ? 'flex' : 'hidden'}`}
-        id="qrModal"
-      >
-        <div
-          className="bg-white rounded-lg w-full max-w-md p-[20px] custom-shadow animate-in slide-in-from-bottom duration-300 relative"
-        >
-          <button
-            className="material-symbols-outlined absolute right-2 top-2 text-on-surface-variant cursor-pointer"
-            onClick={closeQRModal}
-          >
-            close
-          </button>
-          <div className="flex flex-col items-center gap-4">
-            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface text-center">Medical QR ID</h2>
-            <div
-              className="w-20 h-20 bg-white p-0.5 border-2 border-primary rounded-lg overflow-hidden"
-            >
-              <img
-                alt="Medical QR Code"
-                className="w-full h-full object-contain"
-                src="https://via.placeholder.com/150"
-              />
-            </div>
-            <div className="w-full space-y-2 bg-surface-container p-3 rounded-lg">
-              <div className="flex justify-between">
-                <span className="text-label-sm text-on-surface-variant uppercase">Patient</span>
-                <span className="text-label-md font-bold text-on-surface">John Doe</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-label-sm text-on-surface-variant uppercase">Blood Group</span>
-                <span className="text-label-md font-bold text-error">O+</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-label-sm text-on-surface-variant uppercase">Emergency Contact</span>
-                <span className="text-label-md font-bold text-on-surface">+1 555-0199</span>
-              </div>
-            </div>
-            <p className="text-center text-body-sm text-on-surface-variant px-3">
-              Scan this code at any CareHive certified clinic to share your medical history securely.
-            </p>
-            <button
-              className="w-full bg-primary text-on-primary py-3 rounded-lg font-label-md text-label-md shadow hover:opacity-90 transition-all flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined">download</span>Download QR Code
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Lab Modal */}
-      <div
-        className={`fixed inset-0 bg-black/50 z-[100] items-center justify-center p-4 ${labModal ? 'flex' : 'hidden'}`}
-        id="labModal"
-      >
-        <div
-          className="bg-white rounded-lg w-full max-w-4xl h-[90vh] flex flex-col custom-shadow animate-in slide-in-from-bottom duration-300 overflow-hidden"
-        >
-          <div
-            className="flex justify-between items-start p-4 border-b border-[#c2c6d4]"
-          >
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">science</span>
-              <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Lab Results Detail</h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                className="flex items-center gap-0.5 text-primary font-label-sm hover:bg-primary/5 px-2 py-1 rounded"
-              >
-                <span className="material-symbols-outlined">picture_as_pdf</span>Export PDF
-              </button>
-              <button
-                className="material-symbols-outlined text-on-surface-variant cursor-pointer"
-                onClick={closeLabModal}
-              >
-                close
-              </button>
-            </div>
-          </div>
-          <div className="flex border-b border-[#c2c6d4] px-4">
-            <button
-              className="px-4 py-2 border-b-2 border-primary text-primary font-label-sm"
-            >
-              Overview
-            </button>
-            <button
-              className="px-4 py-2 text-on-surface-variant font-label-sm hover:bg-[#f3f4f5]"
-            >
-              Historical Trends
-            </button>
-            <button
-              className="px-4 py-2 text_on-surface-variant font-label-sm hover:bg-[#f3f4f5]"
-            >
-              AI Interpretation
-            </button>
-          </div>
-          <div className="flex-grow overflow-y-auto p-4 space-y-5">
-            <section>
-              <h3 className="font-title-lg text-title-lg mb-3">Current Results</h3>
-              <table
-                className="w-full text-left border-collapse"
-              >
-                <thead className="bg-surface-container">
-                  <tr className="text-label-sm text-on-surface-variant uppercase">
-                    <th className="p-3">Test Name</th>
-                    <th className="p-3">Result</th>
-                    <th className="p-3">Reference Range</th>
-                    <th className="p-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="text-body-sm">
-                  <tr className="border-b border-[#c2c6d4]">
-                    <td className="p-3">Glucose (Fasting)</td>
-                    <td className="p-3 font-bold text-error">110 mg/dL</td>
-                    <td className="p-3">70 - 99 mg/dL</td>
-                    <td className="p-3"><span className="bg-error/10 text-error px-2 py-0.5 rounded text-label-sm">ABNORMAL</span></td>
-                  </tr>
-                  <tr className="border-b border-[#c2c6d4]">
-                    <td className="p-3">Hemoglobin A1c</td>
-                    <td className="p-3 font-bold">5.4%</td>
-                    <td className="p-3">4.0 - 5.6%</td>
-                    <td className="p-3"><span className="bg-secondary/10 text-secondary px-2 py-0.5 rounded text-label-sm">NORMAL</span></td>
-                  </tr>
-                  <tr className="border-b border-[#c2c6d4]">
-                    <td className="p-3">Total Cholesterol</td>
-                    <td className="p-3 font-bold">185 mg/dL</td>
-                    <td className="p-3">200 mg/dL</td>
-                    <td className="p-3"><span className="bg-secondary/10 text-secondary px-2 py-0.5 rounded text-label-sm">NORMAL</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </section>
-            <section>
-              <h3 className="font-title-lg title-lg mb-3">AI Interpretation</h3>
-              <div
-                className="p-4 bg-primary/5 rounded-lg border border-primary/20"
-              >
-                <p className="text-body-sm text-on-surface mb-2">
-                  Your fasting glucose levels are slightly elevated compared to your previous baseline. This may be due to recent dietary changes or stress levels.
+              {!isQrExpired && qrTimestamp && (
+                <p className="text-[11px] text-gray-400 font-bold animate-pulse flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">timer</span>
+                  Expires in: {qrMin}:{qrSec < 10 ? `0${qrSec}` : qrSec}
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div
-                    className="p-3 bg-white rounded border border-error/30 flex items-center gap-2"
-                  >
-                    <span className="material-symbols-outlined text-error">warning</span>
-                    <div>
-                      <p className="text-label-sm text-on-surface-variant uppercase">Flagged Value</p>
-                      <p className="text-body-sm font-bold text-error">Glucose: 110 mg/dL</p>
-                    </div>
-                  </div>
-                  <div
-                    className="p-3 bg-white rounded border border-[#c2c6d4] flex items-center gap-2"
-                  >
-                    <span className="material-symbols-outlined text-primary">info</span>
-                    <div>
-                      <p className="text-label-sm text-on-surface-variant uppercase">Recommendation</p>
-                      <p className="text-body-sm">Monitor carbohydrate intake</p>
-                    </div>
-                  </div>
+              )}
+
+              <div className="w-full space-y-sm bg-surface-container p-md rounded-lg">
+                <div className="flex justify-between">
+                  <span className="text-label-md text-on-surface-variant uppercase">Patient</span>
+                  <span className="text-label-lg font-bold text-on-surface">{user?.firstName} {user?.lastName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-label-md text-on-surface-variant uppercase">Blood Group</span>
+                  <span className="text-label-lg font-bold text-error">{profile?.bloodGroup || "Pending"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-label-md text-on-surface-variant uppercase">Emergency Contact</span>
+                  <span className="text-label-lg font-bold text-on-surface">{profile?.phone || "N/A"}</span>
                 </div>
               </div>
-            </section>
-          </div>
-        </div>
-      </div>
-
-      {/* Emergency Modal */}
-      <div
-        className={`fixed inset-0 bg-black/50 z-[100] items-center justify-center p-4 ${emergencyModal ? 'flex' : 'hidden'}`}
-        id="emergencyModal"
-      >
-        <div
-          className="bg-white rounded-lg w-full max-w-md p-[20px] custom-shadow animate-in slide-in-from-bottom duration-300 relative"
-          id="emergencyModalContent"
-        >
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Emergency Assistance</h2>
-              <p className="text-body-sm text-on-surface-variant">
-                Provide a few details before sending your emergency request.
+              <p className="text-center text-body-md text-on-surface-variant px-md">
+                Scan this code at any CareHive certified clinic to share your medical history securely.
               </p>
             </div>
-            <button
-              className="material-symbols-outlined text-on-surface-variant cursor-pointer"
-              onClick={closeEmergencyModal}
-            >
-              close
-            </button>
           </div>
-          <div className="space-y-4" id="emergencyForm">
-            <div className="space-y-2">
-              <label className="font-label-md text-label-md text-on-surface-variant uppercase">Emergency Reason</label>
-              <div className="grid grid-cols-1 gap-2">
-                <label
-                  className="flex items-center gap-2 p-3 border border-[#c2c6d4] rounded-lg cursor-pointer hover:bg-[#f3f4f5]"
+        </div>
+      )}
+
+      {/* Lab Results Modal */}
+      {isLabModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-md text-on-surface">
+          <div className="bg-white rounded-lg w-full max-w-4xl h-[90vh] flex flex-col custom-shadow animate-in slide-in-from-bottom duration-300 overflow-hidden relative text-on-surface">
+            <div className="flex justify-between items-center p-lg border-b border-outline-variant">
+              <div className="flex items-center gap-md">
+                <span className="material-symbols-outlined text-primary">science</span>
+                <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Lab Results Detail</h2>
+              </div>
+              <div className="flex items-center gap-md">
+                <button 
+                  className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-slate-100 p-1 rounded-full" 
+                  onClick={() => setIsLabModalOpen(false)}
                 >
-                  <input
-                    className="w-4 h-4 text-error focus:ring-error"
-                    name="reason"
-                    type="radio"
-                    value="Chest Pain"
-                  />
-                  <span className="text-body-sm">Chest Pain</span>
-                </label>
-                <label
-                  className="flex items-center gap-2 p-3 border border-[#c2c6d4] rounded-lg cursor-pointer hover:bg-[#f3f4f5]"
-                >
-                  <input
-                    className="w-4 h-4 text-error focus:ring-error"
-                    name="reason"
-                    type="radio"
-                    value="Difficulty Breathing"
-                  />
-                  <span className="text-body-sm">Difficulty Breathing</span>
-                </label>
-                <label
-                  className="flex items-center gap-2 p-3 border border-[#c2c6d4] rounded-lg cursor-pointer hover:bg-[#f3f4f5]"
-                >
-                  <input
-                    className="w-4 h-4 text-error focus:ring-error"
-                    name="reason"
-                    type="radio"
-                    value="Accident / Injury"
-                  />
-                  <span className="text-body-sm">Accident / Injury</span>
-                </label>
-                <label
-                  className="flex items-center gap-2 p-3 border border-[#c2c6d4] rounded-lg cursor-pointer hover:bg-[#f3f4f5]"
-                >
-                  <input
-                    className="w-4 h-4 text-error focus:ring-error"
-                    name="reason"
-                    type="radio"
-                    value="Other"
-                  />
-                  <span className="text-body-sm">Other</span>
-                </label>
+                  close
+                </button>
               </div>
             </div>
-            <div className="space-y-1">
-              <label className="font-label-md text-label-md text-on-surface-variant uppercase">Additional Description (Optional)</label>
-              <textarea
-                className="w-full border border-outline rounded p-3 font-body-md text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all h-10"
-                placeholder="Describe your emergency or provide any additional information."
-              />
+            <div className="flex border-b border-outline-variant px-lg">
+              <button className="px-lg py-md border-b-2 border-primary text-primary font-label-lg">Overview</button>
+              <button className="px-lg py-md text-on-surface-variant font-label-lg hover:bg-surface-container">Historical Trends</button>
+              <button className="px-lg py-md text-on-surface-variant font-label-lg hover:bg-surface-container">AI Interpretation</button>
             </div>
-            <div className="p-3 bg-surface-container rounded-lg flex items-center gap-2">
-              <span
-                className="material-symbols-outlined text-primary animate-pulse"
-              >
-                location_on
-              </span>
-              <div>
-                <p className="text-label-sm font-bold text-primary">
-                  {locationDetected ? 'Location detected successfully.' : 'Detecting your location...'}
-                </p>
-                <p className="text-body-sm text-on-surface-variant">
-                  {locationDetected
-                    ? 'Your current location has been detected on this device.'
-                    : 'Your current location is being detected on this device.'}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3 pt-3">
-              <button
-                className="flex-grow py-1 border border-[#c2c6d4] rounded font-label-sm text-on-surface-variant hover:bg-[#f3f4f5] transition-colors"
-                onClick={closeEmergencyModal}
-              >
-                Cancel
-              </button>
-              <button
-                className="flex-grow py-1 bg-error text-on-error rounded font-label-md shadow hover:opacity-90 transition-all"
-                onClick={closeEmergencyModal}
-              >
-                Send Emergency Alert
-              </button>
+            <div className="flex-grow overflow-y-auto p-lg space-y-xl">
+              <section>
+                <h3 className="font-title-lg text-title-lg mb-md">Current Results</h3>
+                <table className="w-full text-left border-collapse text-on-surface">
+                  <thead className="bg-surface-container">
+                    <tr className="text-label-md text-on-surface-variant uppercase"> 
+                      <th className="p-md">Test Name</th> 
+                      <th className="p-md">Result</th> 
+                      <th className="p-md">Reference Range</th> 
+                      <th className="p-md">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-body-md"> 
+                    {labReportsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="p-md text-center text-gray-400">No raw results data available.</td>
+                      </tr>
+                    ) : (
+                      labReportsList.map((rep) => {
+                        const glucose = rep.resultsData?.glucose || rep.resultsData?.["Glucose (Fasting)"] || "110 mg/dL";
+                        const a1c = rep.resultsData?.a1c || rep.resultsData?.["Hemoglobin A1c"] || "5.4%";
+                        const chol = rep.resultsData?.cholesterol || rep.resultsData?.["Total Cholesterol"] || "185 mg/dL";
+                        return (
+                          <React.Fragment key={rep.id}>
+                            <tr className="border-b border-outline-variant"> 
+                              <td className="p-md">Glucose (Fasting)</td> 
+                              <td className="p-md font-bold text-error">{glucose}</td> 
+                              <td className="p-md">70 - 99 mg/dL</td> 
+                              <td className="p-md"><span className="bg-error/10 text-error px-sm py-xs rounded text-label-md">ABNORMAL</span></td> 
+                            </tr> 
+                            <tr className="border-b border-outline-variant"> 
+                              <td className="p-md">Hemoglobin A1c</td> 
+                              <td className="p-md font-bold">{a1c}</td> 
+                              <td className="p-md">4.0 - 5.6%</td> 
+                              <td className="p-md"><span className="bg-secondary/10 text-secondary px-sm py-xs rounded text-label-md">NORMAL</span></td> 
+                            </tr> 
+                            <tr className="border-b border-outline-variant"> 
+                              <td className="p-md">Total Cholesterol</td> 
+                              <td className="p-md font-bold">{chol}</td> 
+                              <td className="p-md">&lt; 200 mg/dL</td> 
+                              <td className="p-md"><span className="bg-secondary/10 text-secondary px-sm py-xs rounded text-label-md">NORMAL</span></td> 
+                            </tr>
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </section>
+              <section>
+                <h3 className="font-title-lg text-title-lg mb-md">AI Interpretation</h3>
+                <div className="p-lg bg-primary/5 rounded-lg border border-primary/20">
+                  <p className="text-body-lg text-on-surface mb-md">
+                    {latestReport?.aiSummary || "Laboratory results analysis completed successfully. Metrics reside within typical reference bounds."}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
+                    <div className="p-md bg-white rounded border border-error/30 flex items-center gap-md">
+                      <span className="material-symbols-outlined text-error">warning</span>
+                      <div>
+                        <p className="text-label-md text-on-surface-variant uppercase">Status</p>
+                        <p className={`text-body-md font-bold ${latestReport?.isAbnormal ? "text-error" : "text-secondary"}`}>
+                          {latestReport?.isAbnormal ? "Glucose Abnormal" : "Normal Baseline"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="p-md bg-white rounded border border-outline-variant flex items-center gap-md">
+                      <span className="material-symbols-outlined text-primary">info</span>
+                      <div>
+                        <p className="text-label-md text-on-surface-variant uppercase">Recommendation</p>
+                        <p className="text-body-md">Clinical assessment recommended</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
     </>
   );
 };

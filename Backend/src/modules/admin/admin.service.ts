@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma.js';
-import { UserStatus, ApprovalStatus } from '@prisma/client';
+import { UserStatus, ApprovalStatus, StaffStatus } from '@prisma/client';
 import { logger } from '../../lib/logger.js';
+import { hashPassword } from '../../utils/password.util.js';
 
 export class AdminService {
   /**
@@ -138,6 +139,175 @@ export class AdminService {
       // FIXED: Consuming requestId in log
       logger.error("User Suspended by Admin", { requestId, adminId, targetUserId: targetId });
       return suspended;
+    });
+  }
+
+  /**
+   * Create a new Department linked to the Admin's Hospital
+   */
+  async createDepartment(adminUserId: string, name: string, status: 'ACTIVE' | 'INACTIVE', requestId: string) {
+    const hospitalId = await this.getAdminHospital(adminUserId);
+    const existing = await prisma.department.findFirst({
+      where: { hospitalId, name }
+    });
+    if (existing) throw new Error("DEPARTMENT_ALREADY_EXISTS");
+
+    const dept = await prisma.department.create({
+      data: {
+        name,
+        status: status as any,
+        hospitalId
+      }
+    });
+    logger.info("Department created by Admin", { requestId, adminUserId, hospitalId, departmentId: dept.id });
+    return dept;
+  }
+
+  /**
+   * Update Department name or toggle active/inactive status
+   */
+  async updateDepartment(adminUserId: string, departmentId: string, name: string, status: 'ACTIVE' | 'INACTIVE', requestId: string) {
+    const hospitalId = await this.getAdminHospital(adminUserId);
+    const dept = await prisma.department.findFirst({
+      where: { id: departmentId, hospitalId }
+    });
+    if (!dept) throw new Error("DEPARTMENT_NOT_FOUND_IN_YOUR_HOSPITAL");
+
+    const updated = await prisma.department.update({
+      where: { id: departmentId },
+      data: {
+        name: name || undefined,
+        status: (status as any) || undefined
+      }
+    });
+    logger.info("Department updated by Admin", { requestId, adminUserId, departmentId });
+    return updated;
+  }
+
+  /**
+   * Fetch statistics for all clinical departments in the Admin's hospital
+   */
+  async getDepartmentStats(adminUserId: string, requestId: string) {
+    const hospitalId = await this.getAdminHospital(adminUserId);
+    const depts = await prisma.department.findMany({
+      where: { hospitalId },
+      include: {
+        _count: { select: { doctors: true } },
+        doctors: {
+          select: {
+            appointments: { select: { id: true } }
+          }
+        }
+      }
+    });
+
+    const stats = depts.map(d => {
+      const appointmentsCount = d.doctors.reduce((sum, doc) => sum + doc.appointments.length, 0);
+      return {
+        id: d.id,
+        name: d.name,
+        status: d.status,
+        doctorsCount: d._count.doctors,
+        appointmentsCount
+      };
+    });
+
+    logger.info("Department stats fetched by Admin", { requestId, hospitalId });
+    return stats;
+  }
+
+  /**
+   * Fetch all staff (Doctors & Lab Technicians) belonging to the Admin's Hospital
+   */
+  async getHospitalStaff(adminUserId: string, requestId: string) {
+    const hospitalId = await this.getAdminHospital(adminUserId);
+    const [doctors, technicians] = await Promise.all([
+      prisma.doctor.findMany({
+        where: { department: { hospitalId } },
+        include: { department: { select: { name: true } } }
+      }),
+      prisma.labTechnician.findMany()
+    ]);
+
+    const formattedDocs = doctors.map(d => ({
+      id: d.id,
+      userId: d.userId,
+      firstName: d.firstName,
+      lastName: d.lastName,
+      role: 'DOCTOR',
+      specialty: d.specialization,
+      department: d.department.name,
+      license: d.licenseNumber,
+      status: d.status
+    }));
+
+    const formattedTechs = technicians.map(t => ({
+      id: t.id,
+      userId: t.userId,
+      firstName: t.firstName,
+      lastName: t.lastName,
+      role: 'LAB_TECHNICIAN',
+      specialty: 'LIS Diagnostics',
+      department: 'Laboratory',
+      license: t.employeeId,
+      status: t.status
+    }));
+
+    logger.info("Hospital staff fetched by Admin", { requestId, hospitalId });
+    return [...formattedDocs, ...formattedTechs];
+  }
+
+  /**
+   * Create User and Role profile for Doctors / Lab Technicians
+   */
+  async registerStaffUser(adminUserId: string, data: any, requestId: string) {
+    const hospitalId = await this.getAdminHospital(adminUserId);
+    const { email, password, firstName, lastName, role, departmentId, licenseNumber, employeeId, specialization } = data;
+
+    const hashedPassword = await hashPassword(password);
+    const roleRecord = await prisma.role.findUnique({ where: { name: role } });
+    if (!roleRecord) throw new Error("INVALID_ROLE");
+
+    return prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          passwordHash: hashedPassword,
+          roleId: roleRecord.id
+        }
+      });
+
+      if (role === 'DOCTOR') {
+        if (!departmentId) throw new Error("DEPARTMENT_ID_REQUIRED");
+        const dept = await tx.department.findFirst({ where: { id: departmentId, hospitalId } });
+        if (!dept) throw new Error("DEPARTMENT_NOT_FOUND_IN_YOUR_HOSPITAL");
+
+        await tx.doctor.create({
+          data: {
+            userId: user.id,
+            firstName,
+            lastName,
+            specialization: specialization || 'GENERAL_MEDICINE',
+            licenseNumber,
+            departmentId,
+            approvalStatus: ApprovalStatus.APPROVED,
+            status: StaffStatus.ACTIVE
+          }
+        });
+      } else if (role === 'LAB_TECHNICIAN') {
+        await tx.labTechnician.create({
+          data: {
+            userId: user.id,
+            firstName,
+            lastName,
+            employeeId,
+            status: StaffStatus.ACTIVE
+          }
+        });
+      }
+
+      logger.info("Staff user registered by Admin", { requestId, adminUserId, email, role });
+      return user;
     });
   }
 }

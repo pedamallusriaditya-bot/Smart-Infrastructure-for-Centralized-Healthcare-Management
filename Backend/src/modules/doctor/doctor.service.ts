@@ -72,7 +72,8 @@ export class DoctorService {
         lastName: true,
         specialization: true,
         licenseNumber: true,
-        department: { select: { name: true } }
+        departmentId: true,
+        department: { select: { id: true, name: true, hospitalId: true } }
       },
       skip: filters.skip,
       take: filters.take,

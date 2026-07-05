@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { loginUser } from '../../api/auth.api';
 import { getRouteByRole } from '../../utils/auth.utils';
+import { getAssignedHospitals } from '../../api/admin.api';
 import { Loader2, Lock, Mail, AlertCircle } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
@@ -15,34 +16,40 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Inside handleSubmit in LoginPage.tsx:
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsLoading(true);
-  try {
-    const data = await loginUser({ email, password });
-    login(data);
-    navigate(getRouteByRole(data.user.role));
-  } catch (err: any) {
-  // LOG THE RAW ERROR TO CONSOLE SO YOU CAN SEE IT
-  console.error("DEBUG LOGIN ERROR:", err.response?.data);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await loginUser({ email, password });
+      login(data);
 
-  const backendMessage = err.response?.data?.message;
-  const backendCode = err.response?.data?.code;
+      // If user is doctor or lab technician, initialize default hospitalId in session
+      if (data.user.role === 'LAB_TECHNICIAN' || data.user.role === 'DOCTOR') {
+        const hospitals = await getAssignedHospitals().catch(() => []);
+        if (hospitals && hospitals.length > 0) {
+          localStorage.setItem('hospitalId', hospitals[0].id);
+        }
+      }
 
-  if (backendCode === 'PENDING_APPROVAL') {
-    setError("Account pending admin approval.");
-  } else {
-    // Show the actual message from the backend (e.g., "Invalid Credentials")
-    setError(backendMessage || "Network connection error.");
-  }
-} finally {
-    setIsLoading(false);
-  }
-};
+      navigate(getRouteByRole(data.user.role));
+    } catch (err: any) {
+      console.error("DEBUG LOGIN ERROR:", err.response?.data);
+      const backendMessage = err.response?.data?.message;
+      const backendCode = err.response?.data?.code;
+
+      if (backendCode === 'PENDING_APPROVAL') {
+        setError("Account pending admin approval.");
+      } else {
+        setError(backendMessage || "Network connection error.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 font-sans">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 font-sans text-on-surface">
       <div className="w-full max-w-[440px]">
         
         {/* Logo Section */}
@@ -59,27 +66,29 @@ const handleSubmit = async (e: React.FormEvent) => {
           <form className="space-y-5" onSubmit={handleSubmit}>
             
             {error && (
-              <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded flex gap-3 text-red-700">
+              <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded flex gap-3 text-red-700 animate-in fade-in duration-300">
                 <AlertCircle className="w-5 h-5 shrink-0" />
                 <p className="text-xs font-bold leading-relaxed">{error}</p>
               </div>
             )}
 
+            {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Hospital Email</label>
+              <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Email ID</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
                   type="email" 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 outline-none transition-all"
-                  placeholder="name@hospital.med" 
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 outline-none transition-all text-on-surface"
+                  placeholder="Enter your email ID" 
                   required 
                 />
               </div>
             </div>
 
+            {/* Password Field */}
             <div className="space-y-1.5">
               <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Password</label>
               <div className="relative">
@@ -88,7 +97,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   type="password" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 outline-none transition-all text-on-surface"
                   placeholder="••••••••" 
                   required 
                 />
@@ -98,7 +107,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full py-4 bg-[#00488d] text-white rounded-xl font-bold hover:bg-[#00366d] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-100"
+              className="w-full py-4 bg-[#00488d] text-white rounded-xl font-bold hover:bg-[#00366d] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-100 cursor-pointer"
             >
               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify Identity"}
             </button>

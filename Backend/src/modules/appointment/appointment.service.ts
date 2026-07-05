@@ -14,6 +14,10 @@ export const getAllAppointments = async (query: any, userId: string, role: strin
     if (!doctor) throw new Error('Doctor not found');
     where.doctorId = doctor.id;
   } else {
+    const admin = await prisma.admin.findUnique({ where: { userId } });
+    if (admin) {
+      where.doctor = { department: { hospitalId: admin.hospitalId } };
+    }
     if (query.doctorId) where.doctorId = query.doctorId;
     if (query.patientId) where.patientId = query.patientId;
   }

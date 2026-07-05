@@ -26,16 +26,40 @@ async function main() {
     }
   });
 
-  // 3. Setup Department
-  await prisma.department.upsert({
-    where: { id: cardiologyId },
-    update: {},
-    create: {
-      id: cardiologyId,
-      name: 'Cardiology',
-      hospitalId: hospital.id
+  // 3. Setup Departments
+  const deptList = [
+    { name: 'Cardiology', id: cardiologyId },
+    { name: 'General Physician' },
+    { name: 'Neurology' },
+    { name: 'Pediatrics' },
+    { name: 'Orthopedics' },
+    { name: 'Emergency Medicine' },
+    { name: 'Pulmonology' },
+    { name: 'Dermatology' },
+    { name: 'ENT' },
+    { name: 'Ophthalmology' },
+    { name: 'Gynecology' },
+    { name: 'Psychiatry' },
+    { name: 'Oncology' },
+    { name: 'Radiology' },
+    { name: 'Anesthesiology' },
+    { name: 'Laboratory Technician' }
+  ];
+
+  for (const d of deptList) {
+    const existing = await prisma.department.findFirst({
+      where: { hospitalId: hospital.id, name: d.name }
+    });
+    if (!existing) {
+      await prisma.department.create({
+        data: {
+          id: d.id || undefined,
+          name: d.name,
+          hospitalId: hospital.id
+        }
+      });
     }
-  });
+  }
 
   // 4. Setup Roles
   const roles = ['ADMIN', 'DOCTOR', 'PATIENT'];

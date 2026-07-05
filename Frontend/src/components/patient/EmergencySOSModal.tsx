@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, MapPin, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { triggerEmergencySOS } from '../../api/emergency.api';
+import axiosInstance from '../../api/axiosInstance';
 
 const EMERGENCY_REASONS = [
   "Chest Pain / Cardiac",
@@ -20,16 +21,25 @@ interface Props { isOpen: boolean; onClose: () => void; }
 const EmergencySOSModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [reason, setReason] = useState("");
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [selectedHospitalId, setSelectedHospitalId] = useState("");
   const [step, setStep] = useState<'form' | 'success'>('form');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       navigator.geolocation.getCurrentPosition(
-        // Change 'p' to 'pos' here
         (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
         () => console.error("Location blocked")
       );
+
+      axiosInstance.get('/hospitals')
+        .then(res => {
+          const list = res.data.data || [];
+          setHospitals(list);
+          if (list.length > 0) setSelectedHospitalId(list[0].id);
+        })
+        .catch(err => console.error("Failed to load hospitals for SOS", err));
     }
   }, [isOpen]);
 
@@ -39,8 +49,9 @@ const EmergencySOSModal: React.FC<Props> = ({ isOpen, onClose }) => {
       await triggerEmergencySOS({
         description: reason,
         latitude: location?.lat || 0,
-        longitude: location?.lng || 0
-      });
+        longitude: location?.lng || 0,
+        hospitalId: selectedHospitalId || undefined
+      } as any);
       setStep('success');
     } catch {
       alert("Pipeline failure. Dial local emergency number!");
@@ -68,6 +79,20 @@ const EmergencySOSModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   </label>
                 ))}
               </div>
+              
+              <div className="space-y-xs">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Send dispatch alert to:</label>
+                <select
+                  value={selectedHospitalId}
+                  onChange={(e) => setSelectedHospitalId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl p-md text-sm font-semibold text-gray-700 bg-white focus:border-red-500 outline-none"
+                >
+                  {hospitals.map(h => (
+                    <option key={h.id} value={h.id}>{h.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="p-4 bg-gray-100 rounded-2xl flex items-center gap-3">
                 <MapPin className={location ? "text-green-600" : "text-blue-600 animate-bounce"} />
                 <span className="text-xs font-bold text-gray-500">{location ? "Location Locked" : "Acquiring GPS Signal..."}</span>

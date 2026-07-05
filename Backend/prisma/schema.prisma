@@ -207,6 +207,8 @@ model Hospital {
   name        String
   address     String?
   phone       String?
+  latitude    Float?
+  longitude   Float?
   departments Department[]
   rooms       Room[]
   admins      Admin[]
@@ -520,6 +522,10 @@ model Emergency {
   hospital    Hospital?       @relation(fields: [hospitalId], references: [id])
   status      EmergencyStatus @default(ACTIVE)
   description String?
+  patientLatitude  Float?
+  patientLongitude Float?
+  nearestHospitalId String? @db.Uuid
+  
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 

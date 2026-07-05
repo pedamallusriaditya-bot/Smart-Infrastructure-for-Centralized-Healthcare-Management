@@ -1,13 +1,25 @@
 import { Router } from 'express';
-import { getHospitals, getDepartmentsByHospital } from './hospital.controller.js';
+import { 
+  getHospitals, 
+  getDepartmentsByHospital, 
+  getAllHospitalsFull, 
+  createHospital, 
+  deleteHospital, 
+  assignHospitalAdmin 
+} from './hospital.controller.js';
+import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { requireRole } from '../../middleware/roles.middleware.js';
 
 const router = Router();
 
-// This becomes /api/v1/hospitals/
+// Public routes for patient booking/registration
 router.get('/', getHospitals);
-
-// This becomes /api/v1/hospitals/:hospitalId/departments
-// Ensure there is NO leading slash in front of :hospitalId
 router.get('/:hospitalId/departments', getDepartmentsByHospital);
+
+// Super Admin protected routes
+router.get('/all-detail', authMiddleware, requireRole('ADMIN'), getAllHospitalsFull);
+router.post('/', authMiddleware, requireRole('ADMIN'), createHospital);
+router.delete('/:id', authMiddleware, requireRole('ADMIN'), deleteHospital);
+router.post('/:hospitalId/admin', authMiddleware, requireRole('ADMIN'), assignHospitalAdmin);
 
 export default router;

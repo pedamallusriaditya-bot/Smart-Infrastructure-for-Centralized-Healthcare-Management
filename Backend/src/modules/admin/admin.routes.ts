@@ -20,4 +20,16 @@ router.patch('/doctors/:doctorId/review', ctrl.reviewDoctorAccount);
 // Account Lifecycle
 router.delete('/users/:id', ctrl.suspendUser);
 
+// Rooms & Bed Occupancy Stats
+router.get('/bed-occupancy', ctrl.getBedOccupancy);
+
+// Departments Management
+router.post('/departments', ctrl.createDepartment);
+router.put('/departments/:id', ctrl.updateDepartment);
+router.get('/departments/stats', ctrl.getDepartmentStats);
+
+// Staff Directory & Registry Management
+router.get('/staff', ctrl.getHospitalStaffList);
+router.post('/staff/register', ctrl.registerStaffMember);
+
 export default router;

@@ -16,13 +16,9 @@ export const ownershipGuard = async (
         entity: resource.type,
         entityId: resource.id,
 
-        resourceId: resource.id,
-        resourceType: resource.type,
-
-        status: authorized ? 'SUCCESS' : 'DENIED',
-
         details: {
-          reason
+          reason,
+          status: authorized ? 'SUCCESS' : 'DENIED'
         }
       }
     });

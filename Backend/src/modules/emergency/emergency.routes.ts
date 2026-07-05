@@ -7,6 +7,7 @@ const router = Router();
 router.use(authMiddleware);
 
 // --- Incident Management ---
+router.get('/', ctrl.getEmergencies);
 // Anyone (Patient/Admin) can trigger help
 router.post('/trigger', ctrl.triggerEmergency); 
 // Only clinical/emergency staff can resolve

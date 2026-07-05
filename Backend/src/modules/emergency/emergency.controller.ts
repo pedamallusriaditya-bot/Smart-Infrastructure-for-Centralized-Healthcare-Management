@@ -15,7 +15,10 @@ const RegisterStaffSchema = z.object({
 });
 
 const EmergencyIncidentSchema = z.object({
-  description: z.string().min(5)
+  description: z.string().min(5),
+  hospitalId: z.string().uuid().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional()
 });
 
 function handleEmergencyError(res: Response, req: Request, error: any, fallback: string) {
@@ -31,7 +34,12 @@ function handleEmergencyError(res: Response, req: Request, error: any, fallback:
 export const triggerEmergency = async (req: Request, res: Response): Promise<any> => {
   try {
     const data = EmergencyIncidentSchema.parse(req.body);
-    const result = await emergencyService.createEmergencyIncident(req.user!.id, data);
+    const result = await emergencyService.createEmergencyIncident(req.user!.id, {
+      description: data.description,
+      hospitalId: data.hospitalId,
+      patientLatitude: data.latitude,
+      patientLongitude: data.longitude
+    });
     return successResponse(res, "Emergency incident created. Help is on the way.", result, 201);
   } catch (error: any) {
     return handleEmergencyError(res, req, error, "Failed to trigger emergency");
@@ -76,4 +84,13 @@ export const getActiveStaffList = async (_req: Request, res: Response): Promise<
     } catch (error: any) {
         return errorResponse(res, "Failed", 500);
     }
+};
+
+export const getEmergencies = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const result = await emergencyService.getEmergencies(req.user!.id, req.user!.role);
+    return successResponse(res, "Emergencies list retrieved", result);
+  } catch (error: any) {
+    return errorResponse(res, "Failed to load emergencies list", 500);
+  }
 };

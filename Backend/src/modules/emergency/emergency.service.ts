@@ -1,4 +1,7 @@
 import { prisma } from '../../lib/prisma.js';
+import { EmergencyDispatchService } from '../../services/emergencyDispatch.service.js';
+
+
 import { EmergencyStatus, StaffStatus } from '@prisma/client';
 
 export class EmergencyService {
@@ -37,20 +40,39 @@ export class EmergencyService {
   /**
    * INCIDENT MANAGEMENT (The actual emergencies)
    */
-  async createEmergencyIncident(userId: string, data: { description: string }) {
+  async createEmergencyIncident(
+    userId: string,
+    data: {
+      description: string,
+      hospitalId?: string,
+      patientLatitude?: number,
+      patientLongitude?: number,
+    },
+  ) {
     const patient = await prisma.patient.findUnique({ where: { userId } });
     if (!patient) throw new Error('PATIENT_NOT_FOUND');
 
     return prisma.$transaction(async (tx) => {
+      let hospitalId = data.hospitalId || null;
+      if (!hospitalId) {
+        const defaultHospital = await tx.hospital.findFirst();
+        if (defaultHospital) hospitalId = defaultHospital.id;
+      }
+
       const emergency = await tx.emergency.create({
         data: {
           patientId: patient.id,
           description: data.description,
-          status: 'ACTIVE'
-        }
+          hospitalId: hospitalId || undefined,
+          patientLatitude: data.patientLatitude,
+          patientLongitude: data.patientLongitude,
+          status: EmergencyStatus.ACTIVE,
+        },
       });
 
-      // Notify available staff (logic placeholder)
+      // Dispatch to nearest hospital based on coordinates
+      await EmergencyDispatchService.dispatch(emergency.id);
+
       return emergency;
     });
   }
@@ -58,18 +80,39 @@ export class EmergencyService {
   async resolveEmergency(emergencyId: string) {
     const incident = await prisma.emergency.findUnique({ where: { id: emergencyId } });
     if (!incident) throw new Error('Emergency not found');
-    if (incident.status === 'RESOLVED') throw new Error('ALREADY_RESOLVED');
+    if (incident.status === EmergencyStatus.RESOLVED) throw new Error('ALREADY_RESOLVED');
 
     return prisma.emergency.update({
       where: { id: emergencyId },
-      data: { status: 'RESOLVED' }
+      data: { status: EmergencyStatus.RESOLVED }
     });
   }
 
   async getActiveStaff() {
     return prisma.emergencyStaff.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: StaffStatus.ACTIVE },
       select: { id: true, firstName: true, lastName: true, shiftInfo: true }
+    });
+  }
+
+  async getEmergencies(userId: string, role: string) {
+    const where: any = {};
+    if (role === 'ADMIN') {
+      const admin = await prisma.admin.findUnique({ where: { userId } });
+      if (admin) where.hospitalId = admin.hospitalId;
+    } else if (role === 'DOCTOR') {
+      const doctor = await prisma.doctor.findUnique({ where: { userId }, include: { department: true } });
+      if (doctor) where.hospitalId = doctor.department.hospitalId;
+    } else if (role === 'PATIENT') {
+      const patient = await prisma.patient.findUnique({ where: { userId } });
+      if (patient) where.patientId = patient.id;
+    }
+    return prisma.emergency.findMany({
+      where,
+      include: {
+        patient: { select: { firstName: true, lastName: true } }
+      },
+      orderBy: { createdAt: 'desc' }
     });
   }
 }

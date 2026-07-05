@@ -29,6 +29,7 @@ export const LabFilterSchema = z.object({
   page: z.string().optional().transform(v => Math.max(1, parseInt(v ?? '1'))),
   limit: z.string().optional().transform(v => Math.max(1, parseInt(v ?? '20'))),
   patientId: z.string().uuid().optional(),
+  hospitalId: z.string().uuid().optional(),
 });
 
 export const VerifyReportSchema = z.object({
