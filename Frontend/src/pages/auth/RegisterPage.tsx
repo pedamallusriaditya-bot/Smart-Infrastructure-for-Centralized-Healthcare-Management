@@ -13,7 +13,7 @@ const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [role, setRole] = useState<'PATIENT' | 'DOCTOR'>('PATIENT');
+  const [role, setRole] = useState<'PATIENT' | 'DOCTOR' | 'NURSE'>('PATIENT');
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +42,7 @@ const RegisterPage: React.FC = () => {
   // 2. Fetch Departments & AUTO-SELECT FIX
   useEffect(() => {
     const fetchDepts = async () => {
-      if (formData.hospitalId && role === 'DOCTOR') {
+      if (formData.hospitalId && (role === 'DOCTOR' || role === 'NURSE')) {
         setIsDeptLoading(true);
         try {
           const data = await getDepartmentsByHospital(formData.hospitalId);
@@ -71,7 +71,7 @@ const RegisterPage: React.FC = () => {
     }
 
     // --- PIPELINE GUARD: Prevent Sending empty IDs ---
-    if (role === 'DOCTOR' && (!formData.departmentId || formData.departmentId === "")) {
+    if ((role === 'DOCTOR' || role === 'NURSE') && (!formData.departmentId || formData.departmentId === "")) {
       return setError("Please manually select a Hospital Unit/Department.");
     }
     
@@ -89,11 +89,15 @@ const RegisterPage: React.FC = () => {
         gender: formData.gender,
         bloodGroup: formData.bloodGroup,
         dateOfBirth: formData.dob
-      } : {
+      } : role === 'DOCTOR' ? {
         hospitalId: formData.hospitalId,
         departmentId: formData.departmentId, // VERIFIED UUID
         licenseNumber: formData.license,
         specialization: formData.spec
+      } : {
+        hospitalId: formData.hospitalId,
+        departmentId: formData.departmentId, // VERIFIED UUID
+        employeeId: formData.license
       }
     };
 
@@ -103,6 +107,12 @@ const RegisterPage: React.FC = () => {
       const data = await registerUser(payload);
       if (role === 'DOCTOR') {
         navigate('/login', { state: { info: "SUCCESS" } });
+      } else if (role === 'NURSE') {
+        login(data);
+        if (payload.extraField.hospitalId) {
+          localStorage.setItem('hospitalId', payload.extraField.hospitalId);
+        }
+        navigate('/nurse/dashboard');
       } else {
         login(data);
         navigate('/patient/dashboard');
@@ -127,9 +137,10 @@ const RegisterPage: React.FC = () => {
         </div>
 
         <div className="p-10 space-y-8">
-          <div className="flex p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
-            <button type="button" onClick={() => setRole('PATIENT')} className={`flex-1 py-4 flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all ${role === 'PATIENT' ? 'bg-white text-blue-900 shadow-md' : 'text-slate-500'}`}><User size={18} /> Resident Patient</button>
-            <button type="button" onClick={() => setRole('DOCTOR')} className={`flex-1 py-4 flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all ${role === 'DOCTOR' ? 'bg-white text-blue-900 shadow-md' : 'text-slate-500'}`}><BriefcaseMedical size={18} /> Medical Staff</button>
+          <div className="flex p-1.5 bg-slate-100 rounded-2xl border border-slate-200 gap-1.5">
+            <button type="button" onClick={() => setRole('PATIENT')} className={`flex-1 py-3 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all ${role === 'PATIENT' ? 'bg-white text-blue-900 shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><User size={16} /> Resident Patient</button>
+            <button type="button" onClick={() => setRole('DOCTOR')} className={`flex-1 py-3 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all ${role === 'DOCTOR' ? 'bg-white text-blue-900 shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><BriefcaseMedical size={16} /> Doctor</button>
+            <button type="button" onClick={() => setRole('NURSE')} className={`flex-1 py-3 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all ${role === 'NURSE' ? 'bg-white text-blue-900 shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><BriefcaseMedical size={16} /> Nurse</button>
           </div>
 
           {error && (
@@ -146,7 +157,7 @@ const RegisterPage: React.FC = () => {
 
             <input type="email" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white outline-none transition-all" placeholder="Registry Email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
 
-            {role === 'DOCTOR' && (
+            {(role === 'DOCTOR' || role === 'NURSE') && (
               <div className="space-y-4 bg-teal-50/50 p-8 rounded-[1.5rem] border border-teal-100 animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-teal-600 w-4 h-4" />
@@ -167,17 +178,21 @@ const RegisterPage: React.FC = () => {
                     className="w-full pl-10 pr-4 py-3.5 bg-white border border-teal-200 rounded-xl text-sm font-bold disabled:opacity-50"
                     required
                     disabled={!formData.hospitalId || isDeptLoading}
-                    value={formData.departmentId} // BINDING TO STATE
+                    value={formData.departmentId}
                     onChange={e => setFormData({...formData, departmentId: e.target.value})}
                   >
-                    <option value="" disabled>-- Select Hospital Unit --</option>
+                    <option value="" disabled>-- Select Hospital Unit / Ward --</option>
                     {departments.map((d) => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
                 </div>
 
-                <input className="w-full p-3.5 bg-white border border-teal-100 rounded-xl text-sm" placeholder="Medical License Number" required value={formData.license} onChange={e => setFormData({...formData, license: e.target.value})} />
+                {role === 'DOCTOR' ? (
+                  <input className="w-full p-3.5 bg-white border border-teal-100 rounded-xl text-sm" placeholder="Medical License Number" required value={formData.license} onChange={e => setFormData({...formData, license: e.target.value})} />
+                ) : (
+                  <input className="w-full p-3.5 bg-white border border-teal-100 rounded-xl text-sm" placeholder="Nurse Employee ID" required value={formData.license} onChange={e => setFormData({...formData, license: e.target.value})} />
+                )}
               </div>
             )}
 

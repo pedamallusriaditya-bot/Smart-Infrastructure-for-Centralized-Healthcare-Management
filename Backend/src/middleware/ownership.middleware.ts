@@ -6,6 +6,9 @@ import { logger } from '../lib/logger.js';
 /**
  * Validates that the logged-in user owns the resource they are requesting.
  * Supports: Patient records, Appointments, and Lab Orders.
+ *
+ * ADMIN override: District admins may bypass patient-level ownership checks,
+ * BUT only for resources that belong to patients within their assigned hospital.
  */
 export const checkOwnership = (resourceType: 'PATIENT' | 'APPOINTMENT' | 'LAB_ORDER' | 'MEDICAL_RECORD') => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -18,8 +21,94 @@ export const checkOwnership = (resourceType: 'PATIENT' | 'APPOINTMENT' | 'LAB_OR
 return;
     }
 
-    // 1. ADMIN OVERRIDE: Admins can bypass ownership checks for clinical oversight.
-    if (userRole === 'ADMIN') return next();
+    // ADMIN: Hospital-scoped override — may access resources within their own hospital ONLY
+    if (userRole === 'ADMIN') {
+      try {
+        const admin = await prisma.admin.findUnique({ where: { userId } });
+        if (!admin || !admin.hospitalId) {
+          errorResponse(res, "Your admin account is not assigned to any hospital.", 403, "NO_HOSPITAL_ASSIGNED");
+          return;
+        }
+
+        // Verify the resource belongs to this admin's hospital
+        let resourceBelongsToHospital = false;
+
+        switch (resourceType) {
+          case 'PATIENT': {
+            const patient = await prisma.patient.findFirst({
+              where: {
+                id: resourceId,
+                appointments: { some: { doctor: { department: { hospitalId: admin.hospitalId } } } }
+              }
+            });
+            resourceBelongsToHospital = !!patient;
+            break;
+          }
+          case 'APPOINTMENT': {
+            const appointment = await prisma.appointment.findFirst({
+              where: {
+                id: resourceId,
+                doctor: { department: { hospitalId: admin.hospitalId } }
+              }
+            });
+            resourceBelongsToHospital = !!appointment;
+            break;
+          }
+          case 'LAB_ORDER': {
+            const labOrder = await prisma.labOrder.findFirst({
+              where: {
+                id: resourceId,
+                doctor: { department: { hospitalId: admin.hospitalId } }
+              }
+            });
+            resourceBelongsToHospital = !!labOrder;
+            break;
+          }
+          case 'MEDICAL_RECORD': {
+            const record = await prisma.medicalRecord.findFirst({
+              where: {
+                id: resourceId,
+                patient: {
+                  appointments: { some: { doctor: { department: { hospitalId: admin.hospitalId } } } }
+                }
+              }
+            });
+            resourceBelongsToHospital = !!record;
+            break;
+          }
+        }
+
+        if (!resourceBelongsToHospital) {
+          logger.warn("District Admin Cross-Hospital Ownership Violation (BLOCKED)", {
+            requestId: req.requestId,
+            userId,
+            adminHospitalId: admin.hospitalId,
+            resourceId,
+            resourceType,
+          });
+
+          await prisma.auditLog.create({
+            data: {
+              action: 'CROSS_HOSPITAL_OWNERSHIP_BLOCK',
+              entity: resourceType,
+              entityId: resourceId || 'unknown',
+              userId,
+              details: { adminHospitalId: admin.hospitalId, path: req.originalUrl, ip: req.ip },
+            },
+          }).catch(() => {/* non-blocking */});
+
+          errorResponse(res, "Access Denied: This resource does not belong to your hospital.", 403, "CROSS_HOSPITAL_ACCESS");
+          return;
+        }
+
+        // Resource is within this admin's hospital — allow
+        return next();
+      } catch (error: any) {
+        logger.error("Admin Hospital Ownership Check Fault", { error: error.message, userId });
+        errorResponse(res, "Access Denied", 403, "FORBIDDEN_OWNERSHIP");
+        return;
+      }
+    }
 
     try {
       let isOwner = false;
@@ -88,4 +177,4 @@ return;
 return;
     }
   };
-};
+};

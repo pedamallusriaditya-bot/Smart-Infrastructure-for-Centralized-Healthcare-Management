@@ -11,6 +11,7 @@ const AdminLayout: React.FC = () => {
 
   const menuItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: 'dashboard' },
+    { name: 'Inventory', path: '/admin/inventory', icon: 'inventory_2', hideForSuper: true },
     { name: 'Staff Directory', path: '/admin/staff', icon: 'groups', hideForSuper: true },
     { name: 'Departments', path: '/admin/departments', icon: 'domain', hideForSuper: true },
     { name: 'Doctor Approvals', path: '/admin/doctors-approval', icon: 'verified_user', hideForSuper: true },

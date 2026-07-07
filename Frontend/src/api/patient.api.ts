@@ -57,4 +57,15 @@ export const getLabReports = async (page: number = 1, limit: number = 10) => {
     params: { page, limit }
   });
   return response.data.data;
-};
+};
+
+export const getPatientPrescriptions = async () => {
+  const response = await axiosInstance.get('/prescriptions/patient');
+  return response.data.data;
+};
+
+export const getCareTimeline = async () => {
+  const response = await axiosInstance.get('/patients/care-timeline');
+  return response.data.data;
+};
+

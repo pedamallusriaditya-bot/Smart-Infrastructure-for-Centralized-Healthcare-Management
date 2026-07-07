@@ -8,28 +8,36 @@ import {
   getAppointments,
   getLabReports,
   getMyAdmissionStatus,
-  getAITimeline
+  getAITimeline,
+  getPatientPrescriptions,
+  getCareTimeline
 } from '../../api/patient.api';
-import { Loader2 } from 'lucide-react';
-import EmergencySOSModal from '../../components/patient/EmergencySOSModal';
 import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const renderVal = (val: any) => {
+    if (!val) return "--";
+    if (typeof val === 'object') {
+      return `${val.value || "--"} ${val.unit || ""}`;
+    }
+    return String(val);
+  };
   const [profile, setProfile] = useState<any>(null);
   const [appointmentsList, setAppointmentsList] = useState<any[]>([]);
   const [labReportsList, setLabReportsList] = useState<any[]>([]);
   const [admissionStatus, setAdmissionStatus] = useState<any>(null);
   const [timelineData, setTimelineData] = useState<{ summary: string, events: any[] }>({ summary: "", events: [] });
+  const [prescriptions, setPrescriptions] = useState<any[]>([]);
+  const [careTimeline, setCareTimeline] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [errorState, setErrorState] = useState<string | null>(null);
-  const [isSOSOpen, setIsSOSOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [isLabModalOpen, setIsLabModalOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [emergencyActive, setEmergencyActive] = useState(false);
 
   // QR Modal & Expiration State
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
@@ -66,20 +74,24 @@ const Dashboard: React.FC = () => {
       const prof = await getPatientProfile();
       setProfile(prof);
 
-      const [appts, labs, admission, timeline] = await Promise.all([
+      const [appts, labs, admission, timeline, rx, careTime] = await Promise.all([
         getAppointments().catch(() => []),
         getLabReports().catch(() => ({ reports: [] })),
         getMyAdmissionStatus().catch((err) => {
           if (err.response?.status === 404) return null;
           throw err;
         }),
-        getAITimeline(prof.id).catch(() => ({ summary: "Timeline generation failed", events: [] }))
+        getAITimeline(prof.id).catch(() => ({ summary: "Timeline generation failed", events: [] })),
+        getPatientPrescriptions().catch(() => []),
+        getCareTimeline().catch(() => [])
       ]);
 
       setAppointmentsList(appts || []);
       setLabReportsList(labs.reports || []);
       setAdmissionStatus(admission);
       setTimelineData(timeline);
+      setPrescriptions(rx || []);
+      setCareTimeline(careTime || []);
     } catch (err: any) {
       console.error("Dashboard data load error", err);
       setErrorState(err.response?.data?.message || "Failed to establish secure link with clinical database.");
@@ -229,20 +241,13 @@ const Dashboard: React.FC = () => {
       </section>
 
       {/* Quick Actions Grid */}
-      <section className="fade-in stagger-2 grid grid-cols-1 md:grid-cols-4 gap-md">
+      <section className="fade-in stagger-2 grid grid-cols-1 md:grid-cols-3 gap-md">
         <button 
           onClick={openBookingModal}
           className="flex items-center justify-center gap-base bg-primary text-on-primary py-lg px-xl rounded-lg font-label-lg text-label-lg shadow-md hover:opacity-90 transition-all cursor-pointer"
         >
           <span className="material-symbols-outlined">calendar_today</span>
           Book Appointment
-        </button>
-        <button 
-          onClick={() => setIsSOSOpen(true)}
-          className="flex items-center justify-center gap-base bg-error text-on-error py-lg px-xl rounded-lg font-label-lg text-label-lg shadow-md hover:opacity-90 transition-all cursor-pointer"
-        >
-          <span className="material-symbols-outlined">emergency_share</span>
-          SOS / Emergency
         </button>
         <button 
           onClick={() => setIsLabModalOpen(true)}
@@ -289,12 +294,6 @@ const Dashboard: React.FC = () => {
               <div className="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
                 <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">BMI</span>
                 <span className="font-body-lg text-body-lg text-on-surface">N/A</span>
-              </div>
-              <div className="p-md bg-surface-container rounded-lg flex flex-col gap-xs">
-                <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Emergency Status</span>
-                <span className={`font-body-lg text-body-lg ${emergencyActive ? "text-error font-bold animate-pulse" : "text-on-surface"}`}>
-                  {emergencyActive ? "Emergency Active" : "Waiting for Response"}
-                </span>
               </div>
             </div>
           </div>
@@ -399,7 +398,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
           <div className="flex gap-md border-t border-outline-variant pt-md">
-            <button className="flex-grow text-center py-sm text-primary font-label-lg hover:bg-surface-container transition-colors disabled:opacity-50" disabled={!latestReport}>
+            <button onClick={() => setIsLabModalOpen(true)} className="flex-grow text-center py-sm text-primary font-label-lg hover:bg-surface-container transition-colors disabled:opacity-50" disabled={!latestReport}>
               View Report
             </button>
           </div>
@@ -409,13 +408,35 @@ const Dashboard: React.FC = () => {
         <div className="md:col-span-6 bg-white card-border custom-shadow p-lg rounded-lg flex flex-col justify-between">
           <div>
             <h2 className="font-title-lg text-title-lg text-on-surface mb-md">Current Prescription</h2>
-            <div className="py-8 text-center text-sm text-gray-400">
-              <span className="material-symbols-outlined text-4xl block mb-2">medication_liquid</span>
-              No active prescriptions found in electronic health record.
-              <p className="text-[10px] text-gray-400/80 mt-1">Prescription tracking is unavailable in this clinical portal.</p>
-            </div>
+            {prescriptions.length === 0 ? (
+              <div className="py-8 text-center text-sm text-gray-400">
+                <span className="material-symbols-outlined text-4xl block mb-2">medication_liquid</span>
+                No active prescriptions found in electronic health record.
+                <p className="text-[10px] text-gray-400/80 mt-1">Designated pharmacy order list will sync automatically.</p>
+              </div>
+            ) : (
+              <div className="space-y-sm max-h-48 overflow-y-auto pr-1 text-left">
+                {prescriptions.map((rx) => (
+                  <div key={rx.id} className="p-md bg-slate-50 border border-slate-100 rounded-lg flex flex-col gap-xs text-sm">
+                    <div className="flex justify-between font-bold text-on-surface">
+                      <span>{rx.medicine}</span>
+                      <span className="text-primary text-xs font-semibold">{rx.dosage}</span>
+                    </div>
+                    {rx.instructions && (
+                      <p className="text-xs text-on-surface-variant italic mt-1">"{rx.instructions}"</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Prescribed by Dr. {rx.doctor?.lastName || 'Physician'} on {new Date(rx.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <button className="w-full text-center py-sm border-t border-outline-variant text-primary font-label-lg text-label-lg hover:bg-surface-container transition-colors cursor-not-allowed" disabled>
+          <button 
+            className={`w-full text-center py-sm border-t border-outline-variant font-label-lg text-label-lg transition-colors ${prescriptions.length > 0 ? "text-primary hover:bg-surface-container cursor-pointer" : "text-gray-300 cursor-not-allowed"}`} 
+            disabled={prescriptions.length === 0}
+          >
             View Full Prescription
           </button>
         </div>
@@ -505,31 +526,77 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Medication Timeline */}
+        <div className="md:col-span-12 bg-white card-border custom-shadow p-lg rounded-lg">
+          <h2 className="font-title-lg text-title-lg text-on-surface mb-lg flex items-center gap-md">
+            <span className="material-symbols-outlined text-primary">timeline</span>
+            Medication Life Cycle Timeline (MAR)
+          </h2>
+          <div className="space-y-md">
+            {careTimeline.length === 0 ? (
+              <div className="py-8 text-center text-sm text-gray-400">
+                <span className="material-symbols-outlined text-4xl block mb-2 text-slate-300">receipt_long</span>
+                No active care administrations logged yet.
+                <p className="text-[10px] text-gray-400/80 mt-1">Your clinical medication timeline will automatically sync upon dose verification at the nursing station.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
+                {careTimeline.slice(0, 6).map((event: any, idx: number) => {
+                  let statusColor = "border-primary text-primary bg-blue-50/50";
+                  let typeLabel = "Prescribed";
+                  let icon = "description";
+
+                  if (event.eventType === 'DISPENSING') {
+                    statusColor = "border-amber-500 text-amber-700 bg-amber-50/50";
+                    typeLabel = "Dispensed";
+                    icon = "local_shipping";
+                  } else if (event.eventType === 'MEDICATION_ADMINISTRATION') {
+                    statusColor = "border-green-600 text-green-700 bg-green-50/50";
+                    typeLabel = "Administered";
+                    icon = "vaccines";
+                  }
+
+                  return (
+                    <div key={event.id || idx} className={`p-md border rounded-xl flex flex-col justify-between ${statusColor}`}>
+                      <div className="flex items-center gap-sm mb-sm border-b border-current/10 pb-xs">
+                        <span className="material-symbols-outlined text-md">{icon}</span>
+                        <span className="text-xs uppercase font-black tracking-widest">{typeLabel}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-800 mb-md leading-snug">
+                        {event.description}
+                      </p>
+                      <div className="text-[10px] text-gray-500 font-medium">
+                        {new Date(event.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Quick Access */}
         <div className="md:col-span-12">
           <h2 className="font-title-lg text-title-lg text-on-surface mb-md">Quick Access</h2>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-md">
-            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-md">
+            <div onClick={() => navigate('/patient/my-records')} className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
               <span className="material-symbols-outlined text-primary mb-xs">folder_shared</span>
               <p className="text-label-md">Medical Records</p>
             </div>
-            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+            <div onClick={() => navigate('/patient/appointments')} className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
               <span className="material-symbols-outlined text-primary mb-xs">history</span>
               <p className="text-label-md">Appointment History</p>
             </div>
-            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+            <div onClick={() => setIsLabModalOpen(true)} className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
               <span className="material-symbols-outlined text-primary mb-xs">biotech</span>
               <p className="text-label-md">Lab Reports</p>
             </div>
-            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
-              <span className="material-symbols-outlined text-primary mb-xs">emergency</span>
-              <p className="text-label-md">Emergency History</p>
-            </div>
-            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+            <div onClick={openQRModal} className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
               <span className="material-symbols-outlined text-primary mb-xs">person</span>
               <p className="text-label-md">Profile</p>
             </div>
-            <div className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
+            <div onClick={logout} className="bg-white card-border p-md rounded-lg text-center hover:border-primary cursor-pointer transition-all">
               <span className="material-symbols-outlined text-primary mb-xs">logout</span>
               <p className="text-label-md">Logout</p>
             </div>
@@ -538,14 +605,6 @@ const Dashboard: React.FC = () => {
 
       </div>
 
-      {/* Emergency SOS Modal */}
-      <EmergencySOSModal 
-        isOpen={isSOSOpen} 
-        onClose={() => {
-          setIsSOSOpen(false);
-          setEmergencyActive(true);
-        }} 
-      />
 
       {/* Medical QR Modal */}
       {isQRModalOpen && (
@@ -654,26 +713,26 @@ const Dashboard: React.FC = () => {
                       </tr>
                     ) : (
                       labReportsList.map((rep) => {
-                        const glucose = rep.resultsData?.glucose || rep.resultsData?.["Glucose (Fasting)"] || "110 mg/dL";
-                        const a1c = rep.resultsData?.a1c || rep.resultsData?.["Hemoglobin A1c"] || "5.4%";
-                        const chol = rep.resultsData?.cholesterol || rep.resultsData?.["Total Cholesterol"] || "185 mg/dL";
+                        const glucose = rep.resultsData?.glucose || rep.resultsData?.["Glucose (Fasting)"];
+                        const a1c = rep.resultsData?.a1c || rep.resultsData?.["Hemoglobin A1c"];
+                        const chol = rep.resultsData?.cholesterol || rep.resultsData?.["Total Cholesterol"];
                         return (
                           <React.Fragment key={rep.id}>
                             <tr className="border-b border-outline-variant"> 
                               <td className="p-md">Glucose (Fasting)</td> 
-                              <td className="p-md font-bold text-error">{glucose}</td> 
+                              <td className="p-md font-bold text-error">{renderVal(glucose)}</td> 
                               <td className="p-md">70 - 99 mg/dL</td> 
-                              <td className="p-md"><span className="bg-error/10 text-error px-sm py-xs rounded text-label-md">ABNORMAL</span></td> 
+                              <td className="p-md"><span className={`px-sm py-xs rounded text-label-md ${rep.isAbnormal ? "bg-error/10 text-error" : "bg-secondary/10 text-secondary"}`}>{rep.isAbnormal ? "ABNORMAL" : "NORMAL"}</span></td> 
                             </tr> 
                             <tr className="border-b border-outline-variant"> 
                               <td className="p-md">Hemoglobin A1c</td> 
-                              <td className="p-md font-bold">{a1c}</td> 
+                              <td className="p-md font-bold">{renderVal(a1c)}</td> 
                               <td className="p-md">4.0 - 5.6%</td> 
                               <td className="p-md"><span className="bg-secondary/10 text-secondary px-sm py-xs rounded text-label-md">NORMAL</span></td> 
                             </tr> 
                             <tr className="border-b border-outline-variant"> 
                               <td className="p-md">Total Cholesterol</td> 
-                              <td className="p-md font-bold">{chol}</td> 
+                              <td className="p-md font-bold">{renderVal(chol)}</td> 
                               <td className="p-md">&lt; 200 mg/dL</td> 
                               <td className="p-md"><span className="bg-secondary/10 text-secondary px-sm py-xs rounded text-label-md">NORMAL</span></td> 
                             </tr>

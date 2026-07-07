@@ -104,3 +104,26 @@ export const getPatientProfileForDoctor = async (req: Request, res: Response): P
     return errorResponse(res, "Patient details not found", 404, "NOT_FOUND");
   }
 };
+
+/**
+ * [SELF-SERVICE] Get patient's care timeline events (Prescribed, Dispensed, Administered)
+ */
+export const getCareTimeline = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { prisma } = await import('../../lib/prisma.js');
+    const patient = await prisma.patient.findUnique({
+      where: { userId: req.user!.id }
+    });
+    if (!patient) return errorResponse(res, "Patient profile not found", 404);
+
+    const timeline = await prisma.patientTimeline.findMany({
+      where: { patientId: patient.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return successResponse(res, "Care timeline fetched successfully", timeline, 200);
+  } catch (error: any) {
+    logger.error("getCareTimeline Error", { requestId: req.requestId, error: error.message });
+    return errorResponse(res, "Failed to load care timeline", 500);
+  }
+};

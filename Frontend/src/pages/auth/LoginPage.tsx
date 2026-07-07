@@ -5,6 +5,7 @@ import { loginUser } from '../../api/auth.api';
 import { getRouteByRole } from '../../utils/auth.utils';
 import { getAssignedHospitals } from '../../api/admin.api';
 import { Loader2, Lock, Mail, AlertCircle } from 'lucide-react';
+import axiosInstance from '../../api/axiosInstance';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,66 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Hospital self-registration states
+  const [isHospitalRegOpen, setIsHospitalRegOpen] = useState(false);
+  const [hospitalName, setHospitalName] = useState('');
+  const [hospitalType, setHospitalType] = useState('PHC');
+  const [hospitalAddress, setHospitalAddress] = useState('');
+  const [district, setDistrict] = useState('');
+  const [state, setState] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [hospitalPhone, setHospitalPhone] = useState('');
+  const [hospitalEmail, setHospitalEmail] = useState('');
+  
+  const [adminFirstName, setAdminFirstName] = useState('');
+  const [adminLastName, setAdminLastName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminMobile, setAdminMobile] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [hospitalRegLoading, setHospitalRegLoading] = useState(false);
+
+  const handleHospitalRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setHospitalRegLoading(true);
+    try {
+      await axiosInstance.post('/hospitals/register-public', {
+        hospitalName,
+        hospitalType,
+        address: hospitalAddress,
+        district,
+        state,
+        pincode,
+        phone: hospitalPhone,
+        email: hospitalEmail,
+        firstName: adminFirstName,
+        lastName: adminLastName,
+        adminEmail,
+        mobileNumber: adminMobile,
+        password: adminPassword
+      });
+      alert("Registration submitted successfully! Your hospital registration is awaiting approval from the District Administration.");
+      setIsHospitalRegOpen(false);
+      setHospitalName('');
+      setHospitalType('PHC');
+      setHospitalAddress('');
+      setDistrict('');
+      setState('');
+      setPincode('');
+      setHospitalPhone('');
+      setHospitalEmail('');
+      setAdminFirstName('');
+      setAdminLastName('');
+      setAdminEmail('');
+      setAdminMobile('');
+      setAdminPassword('');
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to register hospital: " + (err.response?.data?.message || err.message));
+    } finally {
+      setHospitalRegLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,14 +174,235 @@ const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+          <div className="mt-8 pt-6 border-t border-gray-100 text-center space-y-4">
             <p className="text-sm text-gray-500 font-medium">
               Don't have a profile? 
               <Link to="/register" className="text-[#00488d] font-bold ml-1.5 hover:underline tracking-tight">Create Medical Account</Link>
             </p>
+            <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-2xl mt-4">
+              <p className="text-sm font-black text-gray-700">Want to register your hospital?</p>
+              <p className="text-xs text-gray-500 mt-1">Register your hospital with CareHive.</p>
+              <button 
+                type="button" 
+                onClick={() => setIsHospitalRegOpen(true)}
+                className="mt-3 w-full py-2.5 bg-[#00488d] text-white rounded-xl text-xs font-bold hover:bg-[#00366b] active:scale-[0.98] transition-all cursor-pointer shadow-sm"
+              >
+                Register Hospital
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Public Hospital Self-Registration Modal */}
+      {isHospitalRegOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 text-on-surface animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-3">
+              <h2 className="text-xl font-bold text-[#00488d] flex items-center gap-2">
+                <span className="material-symbols-outlined text-2xl">domain</span>
+                Register Your Hospital Facility
+              </h2>
+              <button 
+                className="material-symbols-outlined text-gray-400 cursor-pointer hover:bg-gray-100 p-1 rounded-full animate-pulse" 
+                onClick={() => setIsHospitalRegOpen(false)}
+              >
+                close
+              </button>
+            </div>
+            
+            <form onSubmit={handleHospitalRegister} className="space-y-4 text-left">
+              {/* Hospital Section */}
+              <div className="bg-blue-50/50 p-4 rounded-xl space-y-3 border border-blue-100">
+                <h3 className="text-xs font-black uppercase text-[#00488d] tracking-wider">Hospital Details</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Hospital Name</label>
+                    <input 
+                      type="text" 
+                      value={hospitalName} 
+                      onChange={(e) => setHospitalName(e.target.value)} 
+                      placeholder="Metro General" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Hospital Type</label>
+                    <select 
+                      value={hospitalType}
+                      onChange={(e) => setHospitalType(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required
+                    >
+                      <option value="PHC">PHC</option>
+                      <option value="CHC">CHC</option>
+                      <option value="District Hospital">District Hospital</option>
+                      <option value="Private">Private</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Facility Address</label>
+                  <input 
+                    type="text" 
+                    value={hospitalAddress} 
+                    onChange={(e) => setHospitalAddress(e.target.value)} 
+                    placeholder="Street, Locality" 
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                    required 
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">District</label>
+                    <input 
+                      type="text" 
+                      value={district} 
+                      onChange={(e) => setDistrict(e.target.value)} 
+                      placeholder="District" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">State</label>
+                    <input 
+                      type="text" 
+                      value={state} 
+                      onChange={(e) => setState(e.target.value)} 
+                      placeholder="State" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Pincode</label>
+                    <input 
+                      type="text" 
+                      value={pincode} 
+                      onChange={(e) => setPincode(e.target.value)} 
+                      placeholder="Pincode" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Hospital Phone</label>
+                    <input 
+                      type="tel" 
+                      value={hospitalPhone} 
+                      onChange={(e) => setHospitalPhone(e.target.value)} 
+                      placeholder="e.g. +1 555-0199" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Hospital Email</label>
+                    <input 
+                      type="email" 
+                      value={hospitalEmail} 
+                      onChange={(e) => setHospitalEmail(e.target.value)} 
+                      placeholder="info@hospital.com" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Administrator Section */}
+              <div className="bg-gray-50 p-4 rounded-xl space-y-3 border border-gray-200">
+                <h3 className="text-xs font-black uppercase text-gray-500 tracking-wider">Administrator Credentials</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">First Name</label>
+                    <input 
+                      type="text" 
+                      value={adminFirstName} 
+                      onChange={(e) => setAdminFirstName(e.target.value)} 
+                      placeholder="John" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Last Name</label>
+                    <input 
+                      type="text" 
+                      value={adminLastName} 
+                      onChange={(e) => setAdminLastName(e.target.value)} 
+                      placeholder="Doe" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Email ID (Login ID)</label>
+                    <input 
+                      type="email" 
+                      value={adminEmail} 
+                      onChange={(e) => setAdminEmail(e.target.value)} 
+                      placeholder="admin@hospital.com" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Mobile Number</label>
+                    <input 
+                      type="tel" 
+                      value={adminMobile} 
+                      onChange={(e) => setAdminMobile(e.target.value)} 
+                      placeholder="e.g. +1 555-0100" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Login Password</label>
+                  <input 
+                    type="password" 
+                    value={adminPassword} 
+                    onChange={(e) => setAdminPassword(e.target.value)} 
+                    placeholder="••••••••" 
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none text-on-surface"
+                    required 
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit"
+                disabled={hospitalRegLoading}
+                className="w-full bg-[#00488d] hover:bg-[#00366b] text-white py-3.5 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                {hospitalRegLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-sm">cloud_done</span>
+                    Submit Registration Details
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

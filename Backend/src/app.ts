@@ -14,9 +14,25 @@ import authRoutes from './modules/auth/auth.routes.js';
 import patientRoutes from './modules/patient/patient.routes.js';
 import doctorRoutes from './modules/doctor/doctor.routes.js';
 import appointmentRoutes from './modules/appointment/appointment.routes.js';
-import emergencyRoutes from './modules/emergency/emergency.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import labRoutes from './modules/lab/lab.routes.js';
+import prescriptionRoutes from './modules/prescription/prescription.routes.js';
+import medicineRoutes from './modules/prescription/medicine.routes.js';
+import appAdminRoutes from './modules/appAdmin/appAdmin.routes.js';
+import inventoryRoutes from './modules/inventory/inventory.routes.js';
+import nurseRoutes from './modules/nurse/nurse.routes.js';
+import pharmacyRoutes from './modules/pharmacy/pharmacy.routes.js';
+import attendanceRoutes from './modules/attendance/attendance.routes.js';
+import diagnosticRoutes from './modules/diagnostic/diagnostic.routes.js';
+import analyticsRoutes from './modules/analytics/analytics.routes.js';
+import inventoryAiRoutes from './modules/inventory/inventory-ai.routes.js';
+import demandRoutes from './modules/demand/demand.routes.js';
+import referralRoutes from './modules/referral/referral.routes.js';
+import diseaseSurveillanceRoutes from './modules/diseaseSurveillance/diseaseSurveillance.routes.js';
+
+
+import { authMiddleware } from './middleware/auth.middleware.js';
+import { requireRole } from './middleware/roles.middleware.js';
 
 // Global API Routes
 import apiRoutes from './routes/v1/api.routes.js';
@@ -78,16 +94,30 @@ app.get('/health', (_req: Request, res: Response) => {
 
 const API_PREFIX = '/api/v1';
 app.use(`${API_PREFIX}/admissions`, admissionRoutes);
+app.use(`${API_PREFIX}/prescriptions`, prescriptionRoutes);
+app.use(`${API_PREFIX}/medicines`, medicineRoutes);
 // 9. PRIMARY DOMAIN ROUTES
 app.use(`${API_PREFIX}/auth`, authRoutes);
 app.use(`${API_PREFIX}/patients`, patientRoutes);
 app.use(`${API_PREFIX}/doctors`, doctorRoutes);
 app.use(`${API_PREFIX}/appointments`, appointmentRoutes);
-app.use(`${API_PREFIX}/emergencies`, emergencyRoutes);
 app.use(`${API_PREFIX}/admin`, adminRoutes);
 app.use(`${API_PREFIX}/timeline`, apiRoutes);
 app.use(`${API_PREFIX}/lab`, labRoutes);
 app.use(`${API_PREFIX}/hospitals`, hospitalRoutes);
+app.use(`${API_PREFIX}/app-admin`, authMiddleware, requireRole('APPLICATION_ADMIN'), appAdminRoutes);
+app.use(`${API_PREFIX}/inventory`, inventoryRoutes);
+app.use(`${API_PREFIX}/nurse`, nurseRoutes);
+app.use(`${API_PREFIX}/pharmacy`, pharmacyRoutes);
+app.use(`${API_PREFIX}/attendance`, attendanceRoutes);
+app.use(`${API_PREFIX}/diagnostics`, diagnosticRoutes);
+app.use(`${API_PREFIX}/analytics`, analyticsRoutes);
+app.use(`${API_PREFIX}/inventory/ai`, inventoryAiRoutes);
+app.use(`${API_PREFIX}/demand`, demandRoutes);
+app.use(`${API_PREFIX}/referrals`, authMiddleware, referralRoutes);
+app.use(`${API_PREFIX}/disease-surveillance`, authMiddleware, requireRole('APPLICATION_ADMIN'), diseaseSurveillanceRoutes);
+
+
 
 // 11. GLOBAL ERROR HANDLING MIDDLEWARE (Last item)
 app.use(errorMiddleware);

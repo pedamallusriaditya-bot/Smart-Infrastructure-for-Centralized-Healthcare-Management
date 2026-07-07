@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'DOCTOR' | 'PATIENT' | 'LAB_TECHNICIAN' | 'EMERGENCY_STAFF' | 'PHARMACIST';
+export type Role = 'ADMIN' | 'DOCTOR' | 'PATIENT' | 'LAB_TECHNICIAN' | 'EMERGENCY_STAFF' | 'PHARMACIST' | 'APPLICATION_ADMIN' | 'NURSE';
 
 export enum ApprovalStatus {
   PENDING = 'PENDING',

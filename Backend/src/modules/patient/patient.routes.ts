@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as controller from './patient.controller.js';
+import { processPatientChat } from './patientAi.controller.js';
 import { authMiddleware } from '../../middleware/auth.middleware.js';
 import { requireRole } from '../../middleware/roles.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
@@ -38,6 +39,18 @@ router.get(
   '/qr', 
   requireRole('PATIENT'), 
   controller.getPatientQR
+);
+
+router.get(
+  '/care-timeline',
+  requireRole('PATIENT'),
+  controller.getCareTimeline
+);
+
+router.post(
+  '/ai/chat',
+  requireRole('PATIENT'),
+  processPatientChat
 );
 
 /**

@@ -15,7 +15,7 @@ const StaffManagement: React.FC = () => {
     password: '',
     firstName: '',
     lastName: '',
-    role: 'DOCTOR' as 'DOCTOR' | 'LAB_TECHNICIAN',
+    role: 'DOCTOR' as 'DOCTOR' | 'LAB_TECHNICIAN' | 'NURSE' | 'PHARMACIST',
     departmentId: '',
     specialization: 'GENERAL_MEDICINE',
     licenseNumber: '',
@@ -62,10 +62,10 @@ const StaffManagement: React.FC = () => {
         firstName: registerForm.firstName,
         lastName: registerForm.lastName,
         role: registerForm.role,
-        departmentId: registerForm.role === 'DOCTOR' ? registerForm.departmentId : undefined,
+        departmentId: (registerForm.role === 'DOCTOR' || registerForm.role === 'NURSE') ? registerForm.departmentId : undefined,
         specialization: registerForm.role === 'DOCTOR' ? registerForm.specialization : undefined,
-        licenseNumber: registerForm.role === 'DOCTOR' ? registerForm.licenseNumber : undefined,
-        employeeId: registerForm.role === 'LAB_TECHNICIAN' ? registerForm.employeeId : undefined
+        licenseNumber: (registerForm.role === 'DOCTOR' || registerForm.role === 'PHARMACIST') ? registerForm.licenseNumber : undefined,
+        employeeId: (registerForm.role === 'LAB_TECHNICIAN' || registerForm.role === 'NURSE') ? registerForm.employeeId : undefined
       };
 
       await axiosInstance.post('/admin/staff/register', payload);
@@ -149,7 +149,9 @@ const StaffManagement: React.FC = () => {
                   </td>
                   <td className="px-lg py-md">
                     <span className={`px-sm py-1 rounded text-xs font-black uppercase tracking-wider ${
-                      s.role === 'DOCTOR' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
+                      s.role === 'DOCTOR' ? 'bg-blue-50 text-blue-700' :
+                      s.role === 'LAB_TECHNICIAN' ? 'bg-purple-50 text-purple-700' :
+                      s.role === 'NURSE' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'
                     }`}>
                       {s.role}
                     </span>
@@ -192,6 +194,8 @@ const StaffManagement: React.FC = () => {
                 >
                   <option value="DOCTOR">DOCTOR (Physician/Clinician)</option>
                   <option value="LAB_TECHNICIAN">LAB_TECHNICIAN (LIS Analyst)</option>
+                  <option value="NURSE">NURSE (Ward Care Specialist)</option>
+                  <option value="PHARMACIST">PHARMACIST (Pharmacy Practitioner)</option>
                 </select>
               </div>
 
@@ -277,6 +281,43 @@ const StaffManagement: React.FC = () => {
                   placeholder="Technician Employee ID"
                   value={registerForm.employeeId}
                   onChange={(e) => setRegisterForm({ ...registerForm, employeeId: e.target.value })}
+                  className="w-full p-md bg-surface-container border border-outline rounded-xl text-sm focus:border-blue-600 outline-none"
+                />
+              )}
+
+              {/* Nurse Specific fields */}
+              {registerForm.role === 'NURSE' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Assigned Ward / Department</label>
+                    <select
+                      value={registerForm.departmentId}
+                      onChange={(e) => setRegisterForm({ ...registerForm, departmentId: e.target.value })}
+                      className="w-full p-md bg-surface-container border border-outline rounded-xl text-sm focus:border-blue-600 outline-none"
+                    >
+                      <option value="">No Specific Ward Assignment</option>
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nurse Employee ID"
+                    value={registerForm.employeeId}
+                    onChange={(e) => setRegisterForm({ ...registerForm, employeeId: e.target.value })}
+                    className="w-full p-md bg-surface-container border border-outline rounded-xl text-sm focus:border-blue-600 outline-none"
+                  />
+                </>
+              )}
+
+              {/* Pharmacist Specific fields */}
+              {registerForm.role === 'PHARMACIST' && (
+                <input
+                  type="text"
+                  required
+                  placeholder="Pharmacist License Number"
+                  value={registerForm.licenseNumber}
+                  onChange={(e) => setRegisterForm({ ...registerForm, licenseNumber: e.target.value })}
                   className="w-full p-md bg-surface-container border border-outline rounded-xl text-sm focus:border-blue-600 outline-none"
                 />
               )}

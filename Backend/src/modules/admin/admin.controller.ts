@@ -39,6 +39,20 @@ export const getSystemMetrics = asyncHandler(async (req: Request, res: Response)
     return errorResponse(res, "Failed to generate system report", 500);
   }
 });
+
+export const getHospitalPerformanceDashboard = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  try {
+    const data = await adminService.getHospitalPerformanceDashboard(req.user!.id, req.requestId);
+    return successResponse(res, "Hospital performance dashboard metrics retrieved", data, 200);
+  } catch (error: any) {
+    logger.error("getHospitalPerformanceDashboard Error", { requestId: req.requestId, error: error.message });
+    if (error.message === "ADMIN_NOT_ASSIGNED_TO_HOSPITAL") {
+      return errorResponse(res, "Your admin account is not linked to a hospital facility.", 403, "FORBIDDEN");
+    }
+    return errorResponse(res, "Failed to retrieve hospital performance dashboard metrics", 500);
+  }
+});
+
 /**
  * [GET] Doctors awaiting approval for THIS Admin's hospital
  */
@@ -84,12 +98,23 @@ export const reviewDoctorAccount = asyncHandler(async (req: Request, res: Respon
 export const getAuditLogs = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   try {
     const { page, limit } = PaginationSchema.parse(req.query);
-    
-    // FIXED: Now passing 3 arguments (page, limit, requestId)
-    const logs = await adminService.getAuditHistory(page, limit, req.requestId);
+    const filters = {
+      // NOTE: hospitalId filter from query is intentionally excluded —
+      // the service always scopes to the acting admin's own hospital.
+      role: req.query.role as string,
+      entity: req.query.entity as string,
+      date: req.query.date as string,
+      action: req.query.action as string,
+    };
+
+    // Pass adminUserId so service can enforce hospital-scoped audit trail
+    const logs = await adminService.getAuditHistory(req.user!.id, page, limit, filters, req.requestId);
     return successResponse(res, "Audit history fetched", logs, 200);
   } catch (error: any) {
-    return errorResponse(res, "Failed to load logs", 500);
+    if (error.message === "ADMIN_NOT_ASSIGNED_TO_HOSPITAL") {
+      return errorResponse(res, "Your admin account is not linked to a facility.", 403, "FORBIDDEN");
+    }
+    return errorResponse(res, "Failed to load logs: " + error.message, 500);
   }
 });
 
@@ -99,13 +124,18 @@ export const getAuditLogs = asyncHandler(async (req: Request, res: Response): Pr
 export const suspendUser = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
-    
-    // FIXED: Now passing 3 arguments (targetUserId, adminId, requestId)
+
     await adminService.suspendUser(id, req.user!.id, req.requestId);
     return successResponse(res, "User has been suspended and sessions revoked.", null, 200);
   } catch (error: any) {
     if (error.message === "SELF_SUSPEND_FORBIDDEN") {
       return errorResponse(res, "Security: You cannot suspend your own account.", 400);
+    }
+    if (error.message === "TARGET_USER_NOT_IN_YOUR_HOSPITAL") {
+      return errorResponse(res, "Access Denied: This user does not belong to your hospital.", 403, "CROSS_HOSPITAL_ACCESS");
+    }
+    if (error.message === "ADMIN_NOT_ASSIGNED_TO_HOSPITAL") {
+      return errorResponse(res, "Your admin account is not linked to a facility.", 403, "FORBIDDEN");
     }
     return errorResponse(res, "Suspension failed", 500);
   }

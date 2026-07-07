@@ -194,7 +194,7 @@ async function main() {
       appointmentId: pastAppt.id,
       testName: 'Complete Blood Count (CBC)',
       category: LabCategory.HEMATOLOGY,
-      priority: LabPriority.ROUTINE,
+      priority: LabPriority.NORMAL,
       clinicalNotes: 'Screening for anemia and leukocyte count checks.',
       status: LabTestStatus.VERIFIED
     }

@@ -26,12 +26,15 @@ const specializationMap: Record<string, Specialization> = {
   'Cardiology': Specialization.CARDIOLOGY,
   'Dermatology': Specialization.DERMATOLOGY,
   'Emergency Medicine': Specialization.EMERGENCY_MEDICINE,
+  'General Medicine': Specialization.GENERAL_MEDICINE,
   'General Physician': Specialization.GENERAL_MEDICINE,
   'Neurology': Specialization.NEUROLOGY,
   'Oncology': Specialization.ONCOLOGY,
   'Pediatrics': Specialization.PEDIATRICS,
   'Psychiatry': Specialization.PSYCHIATRY,
   'Radiology': Specialization.RADIOLOGY,
+  'Laboratory': Specialization.PATHOLOGY,
+  'Pathology': Specialization.PATHOLOGY,
   'Laboratory Technician': Specialization.PATHOLOGY,
 };
 

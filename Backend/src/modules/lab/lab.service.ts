@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma.js';
 import { LabTestStatus, LabPriority, Prisma } from '@prisma/client';
 import { logger } from '../../lib/logger.js';
 import { AILabService } from './ai.lab.service.js';
+import { writeAuditLog } from '../../utils/auditHelper.js';
 
 const aiService = new AILabService();
 
@@ -50,6 +51,13 @@ export class LabService {
       }
     });
 
+    await prisma.labReport.create({
+      data: {
+        labOrderId: order.id,
+        isAbnormal: false
+      }
+    });
+
     logger.info("LIS: Lab Order successfully initiated", { requestId, orderId: order.id });
     return order;
   }
@@ -90,7 +98,8 @@ export class LabService {
   async fulfillOrder(userUuid: string, orderId: string, payload: any, requestId: string) {
     const order = await prisma.labOrder.findUnique({ where: { id: orderId } });
     
-    if (!order || order.status !== LabTestStatus.PROCESSING) {
+    const allowedStatuses: LabTestStatus[] = [LabTestStatus.ORDERED, LabTestStatus.SAMPLE_RECEIVED, LabTestStatus.PROCESSING];
+    if (!order || !allowedStatuses.includes(order.status)) {
       logger.error("LIS: Fulfillment attempt on unready order", { requestId, orderId, status: order?.status });
       throw new Error("ORDER_MUST_BE_PROCESSING_TO_FULFILL");
     }
@@ -103,21 +112,36 @@ export class LabService {
 
     // ATOMIC TRANSACTION: Ensuring Result consistency
     return prisma.$transaction(async (tx) => {
-      // 1. Create Report
-      const report = await tx.labReport.create({
-        data: {
-          labOrderId: orderId,
-          technicianId: tech.id,
-          resultsData: payload.resultsData as Prisma.InputJsonValue,
-          sampleId: payload.sampleId,
-          fileUrl: payload.fileUrl,
-          attachments: payload.attachments,
-          aiSummary: aiInsights.summary,
-          isAbnormal: aiInsights.isAbnormal,
-          flaggedValues: aiInsights.flaggedFields as Prisma.InputJsonValue,
-          aiRecommendations: aiInsights.recommendations
-        }
+      const existingReport = await tx.labReport.findUnique({
+        where: { labOrderId: orderId }
       });
+
+      const reportData = {
+        technicianId: tech.id,
+        resultsData: payload.resultsData as Prisma.InputJsonValue,
+        sampleId: payload.sampleId,
+        fileUrl: payload.fileUrl,
+        attachments: payload.attachments,
+        aiSummary: aiInsights.summary,
+        isAbnormal: aiInsights.isAbnormal,
+        flaggedValues: aiInsights.flaggedFields as Prisma.InputJsonValue,
+        aiRecommendations: aiInsights.recommendations
+      };
+
+      let report;
+      if (existingReport) {
+        report = await tx.labReport.update({
+          where: { id: existingReport.id },
+          data: reportData
+        });
+      } else {
+        report = await tx.labReport.create({
+          data: {
+            labOrderId: orderId,
+            ...reportData
+          }
+        });
+      }
 
       // 2. Mark parent Order as COMPLETED
       await tx.labOrder.update({ 
@@ -136,6 +160,12 @@ export class LabService {
       });
 
       logger.info("LIS: Fulfilling transaction success", { requestId, reportId: report.id });
+      
+      // Log report submission
+      writeAuditLog(userUuid, 'SUBMIT_LAB_REPORT', 'LabReport', report.id, null, report).catch(err => {
+        logger.error("Failed to log lab report audit log", { error: err.message });
+      });
+
       return report;
     });
   }
@@ -175,6 +205,12 @@ export class LabService {
       });
 
       logger.info("LIS: Sign-off Complete", { requestId, doctorId: doctor.id, reportId });
+      
+      // Log report verification
+      writeAuditLog(userId, 'VERIFY_LAB_REPORT', 'LabReport', reportId, report, updatedReport).catch(err => {
+        logger.error("Failed to log lab verification audit log", { error: err.message });
+      });
+
       return updatedReport;
     });
   }

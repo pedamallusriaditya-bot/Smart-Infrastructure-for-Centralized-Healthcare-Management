@@ -11,6 +11,7 @@ router.use(requireRole('ADMIN'));
 
 // Dashboards
 router.get('/metrics', ctrl.getSystemMetrics);
+router.get('/performance-dashboard', ctrl.getHospitalPerformanceDashboard);
 router.get('/audit', ctrl.getAuditLogs);
 
 // Clinical Governance (Credentialing)

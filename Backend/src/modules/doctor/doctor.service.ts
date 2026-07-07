@@ -7,10 +7,23 @@ export class DoctorService {
    * Fetches the doctor's specific clinical profile.
    */
   async getDoctorProfileByUserId(userId: string, requestId: string) {
-    const doctor = await prisma.doctor.findUnique({
+        const doctor = await prisma.doctor.findUnique({
       where: { userId },
       include: {
-        department: { select: { id: true, name: true } },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            hospital: {
+              select: {
+                id: true,
+                name: true,
+                latitude: true,
+                longitude: true
+              }
+            }
+          }
+        },
         user: { select: { email: true } },
         _count: { select: { appointments: true } }
       }

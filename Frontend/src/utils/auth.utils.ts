@@ -5,6 +5,8 @@ import { Role } from '../types/auth.types';
  */
 export const getRouteByRole = (role: Role | string): string => {
   switch (role) {
+    case 'APPLICATION_ADMIN':
+      return '/app-admin/dashboard';
     case 'ADMIN':
       return '/admin/dashboard';
     case 'DOCTOR':
@@ -15,6 +17,10 @@ export const getRouteByRole = (role: Role | string): string => {
       return '/patient/dashboard';
     case 'EMERGENCY_STAFF':
       return '/admin/emergency'; // Or a dedicated emergency dash
+    case 'NURSE':
+      return '/nurse/dashboard';
+    case 'PHARMACIST':
+      return '/pharmacy/dashboard';
     default:
       return '/login';
   }

@@ -8,10 +8,10 @@ dotenv.config();
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
-  throw new Error("GEMINI_API_KEY is not defined in the .env file.");
+  logger.warn("GEMINI_API_KEY is not defined in the .env file. AI Lab Report Analysis will run in fallback manual mode.");
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 export class AILabService {
   async analyzeReport(
@@ -20,6 +20,9 @@ export class AILabService {
     requestId: string
   ) {
     try {
+      if (!genAI) {
+        throw new Error("GEMINI_API_KEY is not configured.");
+      }
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
       });

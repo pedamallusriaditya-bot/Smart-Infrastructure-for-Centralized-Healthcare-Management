@@ -12,14 +12,16 @@ const authService = new AuthService();
 const RegisterSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(['PATIENT', 'DOCTOR']),
+  role: z.enum(['PATIENT', 'DOCTOR', 'NURSE']),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   extraField: z.object({
     dateOfBirth: z.string().optional(),
     licenseNumber: z.string().optional(),
     departmentId: z.string().uuid().optional(),
-    specialization: z.string().optional()
+    specialization: z.string().optional(),
+    hospitalId: z.string().uuid().optional(),
+    employeeId: z.string().optional()
   }).optional()
 });
 
@@ -71,6 +73,12 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     }
     if (error.message === "DOCTOR_ACCOUNT_REJECTED") {
       return errorResponse(res, "Medical credentials could not be verified.", 401, "REJECTED");
+    }
+    if (error.message === "HOSPITAL_PENDING_APPROVAL") {
+      return errorResponse(res, "Your hospital registration is awaiting approval from the District Administration.", 403, "PENDING_APPROVAL");
+    }
+    if (error.message === "HOSPITAL_REJECTED") {
+      return errorResponse(res, "Your hospital registration has been rejected by the District Head Office.", 403, "REJECTED");
     }
 
     return errorResponse(res, "Invalid email or password", 401, "AUTH_FAILED");

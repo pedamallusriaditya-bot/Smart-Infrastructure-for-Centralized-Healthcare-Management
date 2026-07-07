@@ -21,3 +21,8 @@ export const getDepartmentsByHospital = async (hospitalId: string) => {
   const response = await axiosInstance.get(`/hospitals/${hospitalId}/departments`);
   return response.data.data;
 };
+
+export const getHospitalPerformanceDashboard = async () => {
+  const response = await axiosInstance.get('/admin/performance-dashboard');
+  return response.data.data;
+};

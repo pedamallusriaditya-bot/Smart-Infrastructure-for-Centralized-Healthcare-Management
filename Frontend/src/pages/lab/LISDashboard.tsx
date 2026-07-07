@@ -11,6 +11,110 @@ const LISDashboard: React.FC = () => {
   const [errorState, setErrorState] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Report Submission States
+  const [isSubmitOpen, setIsSubmitOpen] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
+  
+  const [glucoseVal, setGlucoseVal] = useState("110");
+  const [glucoseRemarks, setGlucoseRemarks] = useState("");
+  const [cholesterolVal, setCholesterolVal] = useState("190");
+  const [cholesterolRemarks, setCholesterolRemarks] = useState("");
+  const [hemoglobinVal, setHemoglobinVal] = useState("14.5");
+  const [hemoglobinRemarks, setHemoglobinRemarks] = useState("");
+  const [bpVal, setBpVal] = useState("120/80");
+  const [bpRemarks, setBpRemarks] = useState("");
+  const [plateletsVal, setPlateletsVal] = useState("250000");
+  const [plateletsRemarks, setPlateletsRemarks] = useState("");
+  const [wbcVal, setWbcVal] = useState("7500");
+  const [wbcRemarks, setWbcRemarks] = useState("");
+  const [rbcVal, setRbcVal] = useState("4.8");
+  const [rbcRemarks, setRbcRemarks] = useState("");
+  const [esrVal, setEsrVal] = useState("12");
+  const [esrRemarks, setEsrRemarks] = useState("");
+
+  const [customParams, setCustomParams] = useState<any[]>([]);
+  const [newParamName, setNewParamName] = useState("");
+  const [newParamVal, setNewParamVal] = useState("");
+  const [newParamUnit, setNewParamUnit] = useState("");
+  const [newParamRange, setNewParamRange] = useState("");
+  const [newParamRemarks, setNewParamRemarks] = useState("");
+
+  const [techNotes, setTechNotes] = useState("");
+  const [submitLoading, setSubmitLoading] = useState(false);
+
+  const handleAddCustomParam = () => {
+    if (!newParamName || !newParamVal) return;
+    setCustomParams([...customParams, {
+      name: newParamName,
+      value: newParamVal,
+      unit: newParamUnit,
+      range: newParamRange,
+      remarks: newParamRemarks
+    }]);
+    setNewParamName("");
+    setNewParamVal("");
+    setNewParamUnit("");
+    setNewParamRange("");
+    setNewParamRemarks("");
+  };
+
+  const handleRemoveCustomParam = (index: number) => {
+    setCustomParams(customParams.filter((_, i) => i !== index));
+  };
+
+  const handleOpenSubmitModal = (rep: any) => {
+    setSelectedReport(rep);
+    setIsSubmitOpen(true);
+  };
+
+  const handleLabReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedReport) return;
+    setSubmitLoading(true);
+
+    const resultsData: Record<string, any> = {
+      glucose: { value: glucoseVal, unit: "mg/dL", range: "70-100", remarks: glucoseRemarks || "Normal" },
+      cholesterol: { value: cholesterolVal, unit: "mg/dL", range: "<200", remarks: cholesterolRemarks || "Normal" },
+      hemoglobin: { value: hemoglobinVal, unit: "g/dL", range: "13.8-17.2", remarks: hemoglobinRemarks || "Normal" },
+      bloodPressure: { value: bpVal, unit: "mmHg", range: "<120/80", remarks: bpRemarks || "Normal" },
+      plateletCount: { value: plateletsVal, unit: "mcL", range: "150000-450000", remarks: plateletsRemarks || "Normal" },
+      wbc: { value: wbcVal, unit: "mcL", range: "4500-11000", remarks: wbcRemarks || "Normal" },
+      rbc: { value: rbcVal, unit: "million/mcL", range: "4.5-5.9", remarks: rbcRemarks || "Normal" },
+      esr: { value: esrVal, unit: "mm/hr", range: "0-15", remarks: esrRemarks || "Normal" }
+    };
+
+    customParams.forEach(p => {
+      resultsData[p.name.toLowerCase().replace(/[^a-z0-9]/g, "")] = {
+        value: p.value,
+        unit: p.unit,
+        range: p.range,
+        remarks: p.remarks || "Normal"
+      };
+    });
+
+    const sampleId = `SMP-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    try {
+      await axiosInstance.post(`/lab/reports/${selectedReport.labOrderId}`, {
+        resultsData,
+        sampleId,
+        technicianNotes: techNotes,
+        fileUrl: "https://carehive.med/reports/sample-report.pdf",
+        attachments: []
+      });
+      alert(`Diagnostic report submitted successfully! Generated Sample ID: ${sampleId}`);
+      setIsSubmitOpen(false);
+      setTechNotes("");
+      setCustomParams([]);
+      loadLabData();
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to submit laboratory report: " + (err.response?.data?.message || err.message));
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadLabData();
   }, []);
@@ -265,9 +369,19 @@ const LISDashboard: React.FC = () => {
                             <td className="px-lg py-md">{getPriorityBadge(priority)}</td>
                             <td className="px-lg py-md font-body-md text-body-md">{requestTime}</td>
                             <td className="px-lg py-md">
-                              <button className="px-lg py-xs bg-primary text-on-primary rounded font-label-lg text-label-lg hover:bg-primary-container transition-colors cursor-pointer">
-                                Start Test
-                              </button>
+                              {rep.labOrder?.status === 'ORDERED' || rep.labOrder?.status === 'PROCESSING' ? (
+                                <button 
+                                  onClick={() => handleOpenSubmitModal(rep)}
+                                  className="px-lg py-xs bg-primary text-on-primary rounded font-label-lg text-label-lg hover:opacity-90 transition-all cursor-pointer shadow-sm"
+                                >
+                                  Start Test
+                                </button>
+                              ) : (
+                                <span className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200 font-bold inline-flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-xs">check_circle</span>
+                                  Completed
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );
@@ -356,6 +470,187 @@ const LISDashboard: React.FC = () => {
         </main>
       </div>
 
+      {/* Lab Report Submission Modal */}
+      {isSubmitOpen && selectedReport && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-md text-on-surface animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg w-full max-w-2xl p-xl shadow-2xl relative text-on-surface max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-xl border-b border-outline-variant pb-md">
+              <h2 className="text-2xl font-bold text-[#00488d] flex items-center gap-2">
+                <span className="material-symbols-outlined text-3xl">science</span>
+                Input Diagnostic Results
+              </h2>
+              <button 
+                className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-slate-100 p-1 rounded-full" 
+                onClick={() => setIsSubmitOpen(false)}
+              >
+                close
+              </button>
+            </div>
+            
+            <form onSubmit={handleLabReportSubmit} className="space-y-lg text-left">
+              <div className="grid grid-cols-2 gap-md bg-slate-50 p-md rounded-lg text-sm mb-md">
+                <div>
+                  <span className="font-semibold text-on-surface-variant">Patient:</span> {selectedReport.labOrder?.patient ? `${selectedReport.labOrder.patient.firstName} ${selectedReport.labOrder.patient.lastName}` : "CareHive Patient"}
+                </div>
+                <div>
+                  <span className="font-semibold text-on-surface-variant">Requested Test:</span> {selectedReport.labOrder?.testName || "Diagnostic Analysis"}
+                </div>
+                <div>
+                  <span className="font-semibold text-on-surface-variant">Ordering Physician:</span> {selectedReport.labOrder?.doctor ? `Dr. ${selectedReport.labOrder.doctor.firstName} ${selectedReport.labOrder.doctor.lastName}` : "Staff Doctor"}
+                </div>
+                <div>
+                  <span className="font-semibold text-on-surface-variant">Priority:</span> {selectedReport.labOrder?.priority || "ROUTINE"}
+                </div>
+              </div>
+
+              <h3 className="font-bold text-[#00488d] text-lg border-b border-slate-100 pb-xs">Standard Diagnostic Parameters</h3>
+              
+              <div className="grid grid-cols-2 gap-lg">
+                {/* Glucose */}
+                <div className="space-y-xs">
+                  <label className="text-sm font-bold text-on-surface-variant flex justify-between">
+                    <span>Glucose (Fasting)</span>
+                    <span className="text-xs text-gray-400 font-normal">mg/dL [70 - 100]</span>
+                  </label>
+                  <input type="text" value={glucoseVal} onChange={(e) => setGlucoseVal(e.target.value)} className="w-full border border-outline rounded p-sm text-sm outline-none text-on-surface bg-white" required />
+                  <input type="text" value={glucoseRemarks} onChange={(e) => setGlucoseRemarks(e.target.value)} placeholder="Remarks (e.g. Normal)" className="w-full border border-outline rounded p-xs text-xs outline-none text-on-surface bg-white" />
+                </div>
+
+                {/* Cholesterol */}
+                <div className="space-y-xs">
+                  <label className="text-sm font-bold text-on-surface-variant flex justify-between">
+                    <span>Total Cholesterol</span>
+                    <span className="text-xs text-gray-400 font-normal">mg/dL [&lt; 200]</span>
+                  </label>
+                  <input type="text" value={cholesterolVal} onChange={(e) => setCholesterolVal(e.target.value)} className="w-full border border-outline rounded p-sm text-sm outline-none text-on-surface bg-white" required />
+                  <input type="text" value={cholesterolRemarks} onChange={(e) => setCholesterolRemarks(e.target.value)} placeholder="Remarks" className="w-full border border-outline rounded p-xs text-xs outline-none text-on-surface bg-white" />
+                </div>
+
+                {/* Hemoglobin */}
+                <div className="space-y-xs">
+                  <label className="text-sm font-bold text-on-surface-variant flex justify-between">
+                    <span>Hemoglobin</span>
+                    <span className="text-xs text-gray-400 font-normal">g/dL [13.8 - 17.2]</span>
+                  </label>
+                  <input type="text" value={hemoglobinVal} onChange={(e) => setHemoglobinVal(e.target.value)} className="w-full border border-outline rounded p-sm text-sm outline-none text-on-surface bg-white" required />
+                  <input type="text" value={hemoglobinRemarks} onChange={(e) => setHemoglobinRemarks(e.target.value)} placeholder="Remarks" className="w-full border border-outline rounded p-xs text-xs outline-none text-on-surface bg-white" />
+                </div>
+
+                {/* Blood Pressure */}
+                <div className="space-y-xs">
+                  <label className="text-sm font-bold text-on-surface-variant flex justify-between">
+                    <span>Blood Pressure</span>
+                    <span className="text-xs text-gray-400 font-normal">mmHg [&lt; 120/80]</span>
+                  </label>
+                  <input type="text" value={bpVal} onChange={(e) => setBpVal(e.target.value)} className="w-full border border-outline rounded p-sm text-sm outline-none text-on-surface bg-white" required />
+                  <input type="text" value={bpRemarks} onChange={(e) => setBpRemarks(e.target.value)} placeholder="Remarks" className="w-full border border-outline rounded p-xs text-xs outline-none text-on-surface bg-white" />
+                </div>
+
+                {/* Platelets */}
+                <div className="space-y-xs">
+                  <label className="text-sm font-bold text-on-surface-variant flex justify-between">
+                    <span>Platelet Count</span>
+                    <span className="text-xs text-gray-400 font-normal">mcL [150k - 450k]</span>
+                  </label>
+                  <input type="text" value={plateletsVal} onChange={(e) => setPlateletsVal(e.target.value)} className="w-full border border-outline rounded p-sm text-sm outline-none text-on-surface bg-white" required />
+                  <input type="text" value={plateletsRemarks} onChange={(e) => setPlateletsRemarks(e.target.value)} placeholder="Remarks" className="w-full border border-outline rounded p-xs text-xs outline-none text-on-surface bg-white" />
+                </div>
+
+                {/* WBC */}
+                <div className="space-y-xs">
+                  <label className="text-sm font-bold text-on-surface-variant flex justify-between">
+                    <span>WBC Count</span>
+                    <span className="text-xs text-gray-400 font-normal">mcL [4.5k - 11k]</span>
+                  </label>
+                  <input type="text" value={wbcVal} onChange={(e) => setWbcVal(e.target.value)} className="w-full border border-outline rounded p-sm text-sm outline-none text-on-surface bg-white" required />
+                  <input type="text" value={wbcRemarks} onChange={(e) => setWbcRemarks(e.target.value)} placeholder="Remarks" className="w-full border border-outline rounded p-xs text-xs outline-none text-on-surface bg-white" />
+                </div>
+
+                {/* RBC */}
+                <div className="space-y-xs">
+                  <label className="text-sm font-bold text-on-surface-variant flex justify-between">
+                    <span>RBC Count</span>
+                    <span className="text-xs text-gray-400 font-normal">million/mcL [4.5 - 5.9]</span>
+                  </label>
+                  <input type="text" value={rbcVal} onChange={(e) => setRbcVal(e.target.value)} className="w-full border border-outline rounded p-sm text-sm outline-none text-on-surface bg-white" required />
+                  <input type="text" value={rbcRemarks} onChange={(e) => setRbcRemarks(e.target.value)} placeholder="Remarks" className="w-full border border-outline rounded p-xs text-xs outline-none text-on-surface bg-white" />
+                </div>
+
+                {/* ESR */}
+                <div className="space-y-xs">
+                  <label className="text-sm font-bold text-on-surface-variant flex justify-between">
+                    <span>ESR (Sed Rate)</span>
+                    <span className="text-xs text-gray-400 font-normal">mm/hr [0 - 15]</span>
+                  </label>
+                  <input type="text" value={esrVal} onChange={(e) => setEsrVal(e.target.value)} className="w-full border border-outline rounded p-sm text-sm outline-none text-on-surface bg-white" required />
+                  <input type="text" value={esrRemarks} onChange={(e) => setEsrRemarks(e.target.value)} placeholder="Remarks" className="w-full border border-outline rounded p-xs text-xs outline-none text-on-surface bg-white" />
+                </div>
+              </div>
+
+              {/* Custom Parameters Section */}
+              <h3 className="font-bold text-[#00488d] text-lg border-b border-slate-100 pt-md pb-xs">Custom Diagnostic Parameters</h3>
+              
+              {customParams.length > 0 && (
+                <div className="bg-slate-50 p-sm rounded-lg divide-y divide-outline-variant text-xs">
+                  {customParams.map((p, idx) => (
+                    <div key={idx} className="flex justify-between items-center py-xs font-mono">
+                      <span>{p.name}: {p.value} {p.unit} ({p.range}) - {p.remarks}</span>
+                      <button type="button" onClick={() => handleRemoveCustomParam(idx)} className="text-red-600 hover:text-red-800 font-bold px-1">Remove</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-5 gap-xs items-end">
+                <div className="col-span-1 space-y-1">
+                  <span className="text-[10px] font-bold text-on-surface-variant">Name</span>
+                  <input type="text" placeholder="e.g. Sodium" value={newParamName} onChange={(e) => setNewParamName(e.target.value)} className="w-full border border-outline rounded p-xs text-xs bg-white text-on-surface" />
+                </div>
+                <div className="col-span-1 space-y-1">
+                  <span className="text-[10px] font-bold text-on-surface-variant">Value</span>
+                  <input type="text" placeholder="e.g. 140" value={newParamVal} onChange={(e) => setNewParamVal(e.target.value)} className="w-full border border-outline rounded p-xs text-xs bg-white text-on-surface" />
+                </div>
+                <div className="col-span-1 space-y-1">
+                  <span className="text-[10px] font-bold text-on-surface-variant">Unit</span>
+                  <input type="text" placeholder="e.g. mEq/L" value={newParamUnit} onChange={(e) => setNewParamUnit(e.target.value)} className="w-full border border-outline rounded p-xs text-xs bg-white text-on-surface" />
+                </div>
+                <div className="col-span-1 space-y-1">
+                  <span className="text-[10px] font-bold text-on-surface-variant">Range</span>
+                  <input type="text" placeholder="e.g. 135-145" value={newParamRange} onChange={(e) => setNewParamRange(e.target.value)} className="w-full border border-outline rounded p-xs text-xs bg-white text-on-surface" />
+                </div>
+                <button type="button" onClick={handleAddCustomParam} className="col-span-1 py-1.5 bg-slate-200 hover:bg-slate-300 text-on-surface rounded text-xs font-bold transition-colors cursor-pointer text-center">
+                  Add Param
+                </button>
+              </div>
+
+              <div className="space-y-xs pt-md">
+                <label className="text-sm font-bold text-on-surface-variant">Technician Notes</label>
+                <textarea 
+                  value={techNotes}
+                  onChange={(e) => setTechNotes(e.target.value)}
+                  placeholder="Centrifuge observations, sample quality details..."
+                  className="w-full border border-outline rounded p-md font-body-md text-body-md outline-none transition-all text-on-surface bg-white h-20 resize-none"
+                />
+              </div>
+
+              <button 
+                type="submit"
+                disabled={submitLoading}
+                className="w-full bg-[#00488d] hover:bg-[#00366b] text-white py-lg rounded-lg font-bold shadow transition-all flex items-center justify-center gap-sm disabled:opacity-50 cursor-pointer"
+              >
+                {submitLoading ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined">publish</span>
+                    Submit Laboratory Report
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -80,6 +80,21 @@ export class AuthService {
             approvalStatus: ApprovalStatus.PENDING // Standard hospital policy
           }
         });
+      } else if (role === "NURSE") {
+        if (!extraField?.hospitalId || !extraField?.employeeId || !extraField?.departmentId) {
+           throw new Error("HOSPITAL_AND_EMPLOYEE_ID_REQUIRED");
+        }
+        await tx.nurse.create({
+          data: {
+            userId: newUser.id,
+            firstName,
+            lastName,
+            hospitalId: extraField.hospitalId,
+            employeeId: extraField.employeeId,
+            wardId: extraField.departmentId,
+            status: "ACTIVE"
+          }
+        });
       }
 
       // Step C: Initialize Session Tokens
@@ -112,7 +127,10 @@ export class AuthService {
     const { email, password } = credentials;
     const user = await prisma.user.findUnique({ 
       where: { email }, 
-      include: { role: true } 
+      include: { 
+        role: true,
+        admin: { include: { hospital: true } }
+      } 
     });
 
     if (!user) {
@@ -135,6 +153,18 @@ export class AuthService {
         }
       });
       throw new Error("INVALID_CREDENTIALS");
+    }
+
+    // --- HOSPITAL ADMIN APPROVAL GATE ---
+    if (user.role.name === 'ADMIN' && user.admin?.hospital) {
+      if (user.admin.hospital.status === 'PENDING_APPROVAL') {
+        logger.warn("Gate access denied: Hospital pending approval", { requestId, userId: user.id });
+        throw new Error("HOSPITAL_PENDING_APPROVAL");
+      }
+      if (user.admin.hospital.status === 'REJECTED') {
+        logger.error("Gate access denied: Hospital rejected", { requestId, userId: user.id });
+        throw new Error("HOSPITAL_REJECTED");
+      }
     }
 
     // --- DOCTOR CREDENTIALING GATE (Enterprise Check) ---

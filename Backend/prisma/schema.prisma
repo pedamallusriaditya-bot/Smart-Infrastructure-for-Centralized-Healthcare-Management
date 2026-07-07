@@ -38,6 +38,53 @@ enum RoleType {
   LAB_TECHNICIAN
   PHARMACIST
   EMERGENCY_STAFF
+  APPLICATION_ADMIN
+  NURSE
+}
+
+enum PrescriptionStatus {
+  PENDING
+  DISPENSED
+  PARTIALLY_DISPENSED
+  CANCELLED
+  COMPLETED
+}
+
+enum AdministrationStatus {
+  ADMINISTERED
+  SKIPPED
+  DELAYED
+  REACTION_NOTED
+}
+
+enum MedicationRoute {
+  ORAL
+  IV
+  IM
+  SC
+  TOPICAL
+  INHALATION
+  SUBLINGUAL
+  RECTAL
+  OTHER
+}
+
+enum MedFrequency {
+  ONCE_DAILY
+  TWICE_DAILY
+  THRICE_DAILY
+  FOUR_TIMES_DAILY
+  EVERY_6H
+  EVERY_8H
+  EVERY_12H
+  AS_NEEDED
+  ONCE_WEEKLY
+}
+
+enum HospitalStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
 }
 
 enum UserStatus {
@@ -146,6 +193,7 @@ model User {
   passwordHash      String
   passwordChangedAt DateTime?
   status            UserStatus @default(ACTIVE)
+  district          String?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
   deletedAt         DateTime?
@@ -159,6 +207,7 @@ model User {
   labTechnician  LabTechnician?
   pharmacist     Pharmacist?
   emergencyStaff EmergencyStaff?
+  nurse          Nurse?
 
   sessions            Session[]
   refreshTokens       RefreshToken[]
@@ -169,6 +218,7 @@ model User {
   aiRequests          AIRequest[]
   notifications       Notification[]
   offlineSyncs        OfflineSync[]
+  approvedTransfers   ResourceTransfer[] @relation("ApprovedTransfers")
 
   @@index([email])
   @@index([roleId])
@@ -203,18 +253,42 @@ model RolePermission {
 // ==========================================
 
 model Hospital {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  address     String?
-  phone       String?
-  latitude    Float?
-  longitude   Float?
-  departments Department[]
-  rooms       Room[]
-  admins      Admin[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  emergencies Emergency[]
+  id                       String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                     String
+  address                  String?
+  phone                    String?
+  latitude                 Float?
+  longitude                Float?
+  status                   HospitalStatus                   @default(PENDING_APPROVAL)
+  type                     String? // PHC / CHC / District Hospital / Private
+  district                 String?
+  state                    String?
+  pincode                  String?
+  email                    String?                          @unique
+  rejectionReason          String?
+  approvedAt               DateTime?
+  rejectedAt               DateTime?
+  departments              Department[]
+  rooms                    Room[]
+  admins                   Admin[]
+  nurses                   Nurse[]
+  pharmacists              Pharmacist[]
+  createdAt                DateTime                         @default(now())
+  updatedAt                DateTime                         @updatedAt
+  emergencies              Emergency[]
+  inventoryItems           InventoryItem[]
+  inventoryAlerts          InventoryAlert[]
+  medicationRecords        MedicationAdministrationRecord[]
+  prescriptions            Prescription[]
+  doctorAttendances        DoctorAttendance[]
+  diagnosticAvailabilities DiagnosticAvailability[]
+  demandForecasts          DemandForecast[]
+  ambulancesCount          Int                              @default(5)
+  sourceTransfers          ResourceTransfer[]               @relation("SourceTransfers")
+  destinationTransfers     ResourceTransfer[]               @relation("DestinationTransfers")
+  sourceReferrals          PatientReferral[]                @relation("SourceReferrals")
+  destinationReferrals     PatientReferral[]                @relation("DestinationReferrals")
+  ambulances               Ambulance[]
 }
 
 model Department {
@@ -224,6 +298,7 @@ model Department {
   hospitalId String           @db.Uuid
   hospital   Hospital         @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
   doctors    Doctor[]
+  nurses     Nurse[]
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
 
@@ -291,13 +366,14 @@ model Patient {
   labOrders       LabOrder[]
   invoices        Invoice[]
   timeline        PatientTimeline[]
+  referrals       PatientReferral[]
 
   // ADD THIS LINE TO FIX THE ERROR
-  admissions Admission[]
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  admissions        Admission[]
+  medicationRecords MedicationAdministrationRecord[]
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+  deletedAt         DateTime?
 
   @@index([userId])
 }
@@ -321,27 +397,30 @@ model Doctor {
   medicalRecords MedicalRecord[]
   prescriptions  Prescription[]
   labOrders      LabOrder[]
+  patientReferrals PatientReferral[]
 
   // ADD THIS LINE TO FIX THE ERROR
-  admissions Admission[]
-
-  status    StaffStatus @default(ACTIVE)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  admissions        Admission[]
+  medicationRecords MedicationAdministrationRecord[]
+  status            StaffStatus                      @default(ACTIVE)
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+  doctorAttendances DoctorAttendance[]
 
   @@index([departmentId])
   @@index([approvalStatus])
 }
 
 model Admin {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId     String   @unique @db.Uuid
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  hospitalId String   @db.Uuid
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-  firstName  String
-  lastName   String
-  createdAt  DateTime @default(now())
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @unique @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospitalId   String   @db.Uuid
+  hospital     Hospital @relation(fields: [hospitalId], references: [id])
+  firstName    String
+  lastName     String
+  mobileNumber String?  @unique
+  createdAt    DateTime @default(now())
 }
 
 model LabTechnician {
@@ -357,14 +436,19 @@ model LabTechnician {
 }
 
 model Pharmacist {
-  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String      @unique @db.Uuid
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName String
-  lastName  String
-  licenseId String      @unique
-  status    StaffStatus @default(ACTIVE)
-  createdAt DateTime    @default(now())
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String         @unique @db.Uuid
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName     String
+  lastName      String
+  licenseId     String         @unique
+  status        StaffStatus    @default(ACTIVE)
+  hospitalId    String?        @db.Uuid
+  hospital      Hospital?      @relation(fields: [hospitalId], references: [id])
+  createdAt     DateTime       @default(now())
+  prescriptions Prescription[]
+
+  @@index([hospitalId])
 }
 
 model EmergencyStaff {
@@ -419,20 +503,34 @@ model MedicalRecord {
 }
 
 model Prescription {
-  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  patientId    String                 @db.Uuid
-  doctorId     String                 @db.Uuid
-  patient      Patient                @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor       Doctor                 @relation(fields: [doctorId], references: [id])
-  medicine     String
-  dosage       String
-  instructions String?
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  medicines    PrescriptionMedicine[]
+  id                String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId         String                           @db.Uuid
+  doctorId          String                           @db.Uuid
+  patient           Patient                          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor            Doctor                           @relation(fields: [doctorId], references: [id])
+  medicine          String
+  dosage            String
+  instructions      String?
+  // Extended medication fields
+  status            PrescriptionStatus               @default(PENDING)
+  route             MedicationRoute                  @default(ORAL)
+  frequency         MedFrequency                     @default(ONCE_DAILY)
+  startDate         DateTime?
+  endDate           DateTime?
+  nextDoseTime      DateTime?
+  dispensedAt       DateTime?
+  dispensedById     String?                          @db.Uuid
+  dispensedBy       Pharmacist?                      @relation(fields: [dispensedById], references: [id])
+  hospitalId        String?                          @db.Uuid
+  hospital          Hospital?                        @relation(fields: [hospitalId], references: [id])
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+  medicines         PrescriptionMedicine[]
+  medicationRecords MedicationAdministrationRecord[]
 
   @@index([patientId])
   @@index([doctorId])
+  @@index([status])
 }
 
 model PrescriptionMedicine {
@@ -446,14 +544,15 @@ model PrescriptionMedicine {
 }
 
 model Medicine {
-  id            String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String                 @unique
-  manufacturer  String?
-  stock         Int                    @default(0)
-  price         Float
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  prescriptions PrescriptionMedicine[]
+  id                String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String                           @unique
+  manufacturer      String?
+  stock             Int                              @default(0)
+  price             Float
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+  prescriptions     PrescriptionMedicine[]
+  medicationRecords MedicationAdministrationRecord[]
 }
 
 // ==========================================
@@ -515,19 +614,21 @@ model LabReport {
 // ==========================================
 
 model Emergency {
-  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  patientId   String          @db.Uuid
-  patient     Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  hospitalId  String?         @db.Uuid
-  hospital    Hospital?       @relation(fields: [hospitalId], references: [id])
-  status      EmergencyStatus @default(ACTIVE)
-  description String?
-  patientLatitude  Float?
-  patientLongitude Float?
-  nearestHospitalId String? @db.Uuid
-  
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId         String          @db.Uuid
+  patient           Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  hospitalId        String?         @db.Uuid
+  hospital          Hospital?       @relation(fields: [hospitalId], references: [id])
+  status            EmergencyStatus @default(ACTIVE)
+  description       String?
+  patientLatitude   Float?
+  patientLongitude  Float?
+  nearestHospitalId String?         @db.Uuid
+
+  activeAmbulance   Ambulance?      @relation("ActiveAmbulance")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([patientId])
 }
@@ -655,3 +756,340 @@ model VitalSigns {
   recordedAt      DateTime @default(now())
   createdAt       DateTime @default(now())
 }
+
+// ==========================================
+// INVENTORY MANAGEMENT
+// ==========================================
+
+enum InventoryCategory {
+  MEDICINE
+  BLOOD_UNIT
+  EQUIPMENT
+  CONSUMABLE
+  VACCINE
+  OXYGEN
+}
+
+enum InventoryStatus {
+  ADEQUATE
+  LOW_STOCK
+  CRITICAL
+  OUT_OF_STOCK
+  EXPIRED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertType {
+  LOW_STOCK
+  CRITICAL_STOCK
+  EXPIRED
+  EXPIRING_SOON
+  OUT_OF_STOCK
+}
+
+model InventoryItem {
+  id                String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hospitalId        String                           @db.Uuid
+  hospital          Hospital                         @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  category          InventoryCategory
+  name              String
+  quantity          Int                              @default(0)
+  minQuantity       Int                              @default(0)
+  maxQuantity       Int                              @default(0)
+  unit              String                           @default("units")
+  supplier          String?
+  expiryDate        DateTime?
+  batchNumber       String?
+  unitCost          Float                            @default(0)
+  status            InventoryStatus                  @default(ADEQUATE)
+  usagePerDay       Float?
+  lastRestockedAt   DateTime?
+  notes             String?
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+  alerts            InventoryAlert[]
+  medicationRecords MedicationAdministrationRecord[]
+
+  @@index([hospitalId])
+  @@index([category])
+  @@index([status])
+}
+
+model InventoryAlert {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inventoryItemId String        @db.Uuid
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  hospitalId      String        @db.Uuid
+  hospital        Hospital      @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  alertType       AlertType
+  severity        AlertSeverity
+  message         String
+  isResolved      Boolean       @default(false)
+  resolvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@index([hospitalId, isResolved])
+  @@index([inventoryItemId])
+}
+
+// ==========================================
+// NURSING & MEDICATION ADMINISTRATION
+// ==========================================
+
+model Nurse {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String      @unique @db.Uuid
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospitalId String      @db.Uuid
+  hospital   Hospital    @relation(fields: [hospitalId], references: [id])
+  firstName  String
+  lastName   String
+  employeeId String      @unique
+  wardId     String?     @db.Uuid
+  ward       Department? @relation(fields: [wardId], references: [id])
+  status     StaffStatus @default(ACTIVE)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  medicationRecords MedicationAdministrationRecord[]
+
+  @@index([hospitalId])
+}
+
+model MedicationAdministrationRecord {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId       String               @db.Uuid
+  patient         Patient              @relation(fields: [patientId], references: [id])
+  prescriptionId  String               @db.Uuid
+  prescription    Prescription         @relation(fields: [prescriptionId], references: [id])
+  medicineId      String               @db.Uuid
+  medicine        Medicine             @relation(fields: [medicineId], references: [id])
+  inventoryItemId String?              @db.Uuid
+  inventoryItem   InventoryItem?       @relation(fields: [inventoryItemId], references: [id])
+  nurseId         String               @db.Uuid
+  nurse           Nurse                @relation(fields: [nurseId], references: [id])
+  hospitalId      String               @db.Uuid
+  hospital        Hospital             @relation(fields: [hospitalId], references: [id])
+  dose            String
+  route           MedicationRoute      @default(ORAL)
+  administeredAt  DateTime             @default(now())
+  status          AdministrationStatus @default(ADMINISTERED)
+  batchNumber     String?
+  expirySnapshot  DateTime?
+  remarks         String?
+  reaction        String?
+  createdAt       DateTime             @default(now())
+  doctor          Doctor?              @relation(fields: [doctorId], references: [id])
+  doctorId        String?              @db.Uuid
+
+  @@index([patientId])
+  @@index([nurseId])
+  @@index([hospitalId])
+  @@index([prescriptionId])
+}
+
+// ==========================================
+// DOCTOR ATTENDANCE SYSTEM
+// ==========================================
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  ON_LEAVE
+  EMERGENCY_DUTY
+  BREAK
+}
+
+model DoctorAttendance {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doctorId     String           @db.Uuid
+  doctor       Doctor           @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospitalId   String           @db.Uuid
+  hospital     Hospital         @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  date         DateTime         @db.Date
+  checkInTime  DateTime?
+  checkOutTime DateTime?
+  status       AttendanceStatus @default(PRESENT)
+  workingHours Float? // in hours
+  isLate       Boolean          @default(false)
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([doctorId, date])
+  @@index([doctorId])
+  @@index([hospitalId])
+  @@index([date])
+}
+
+// ==========================================
+// DIAGNOSTIC TEST AVAILABILITY SYSTEM
+// ==========================================
+
+enum TestType {
+  CBC
+  BLOOD_SUGAR
+  ECG
+  MRI
+  CT
+  X_RAY
+  ULTRASOUND
+  BLOOD_BANK
+  COVID
+  URINE_ANALYSIS
+  LIVER_FUNCTION
+  KIDNEY_FUNCTION
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  UNAVAILABLE
+  MAINTENANCE
+  EXTERNAL_REFERRAL
+}
+
+model DiagnosticAvailability {
+  id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hospitalId String             @db.Uuid
+  hospital   Hospital           @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  testType   TestType
+  status     AvailabilityStatus @default(AVAILABLE)
+  cost       Float              @default(0.0)
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([hospitalId, testType])
+  @@index([hospitalId])
+  @@index([testType])
+}
+
+// ==========================================
+// AI DEMAND FORECASTING SYSTEM
+// ==========================================
+
+model DemandForecast {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hospitalId        String   @db.Uuid
+  hospital          Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  forecastHorizon   Int // 7, 30, or 90 days
+  medicineDemand    Json // e.g. [{ name: string, quantity: number }]
+  bedDemand         Int
+  doctorRequirement Int
+  nurseRequirement  Int
+  labLoad           Int
+  bloodRequirement  Json // e.g. [{ bloodGroup: string, quantity: number }]
+  confidenceRate    Float // percentage
+  generatedAt       DateTime @default(now())
+
+  @@index([hospitalId])
+  @@index([forecastHorizon])
+}
+
+// ==========================================
+// AI RESOURCE REDISTRIBUTION SYSTEM
+// ==========================================
+
+enum TransferResourceType {
+  MEDICINE
+  BLOOD
+  DOCTOR
+  NURSE
+  AMBULANCE
+  EQUIPMENT
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model ResourceTransfer {
+  id                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceHospitalId      String               @db.Uuid
+  sourceHospital        Hospital             @relation("SourceTransfers", fields: [sourceHospitalId], references: [id], onDelete: Cascade)
+  destinationHospitalId String               @db.Uuid
+  destinationHospital   Hospital             @relation("DestinationTransfers", fields: [destinationHospitalId], references: [id], onDelete: Cascade)
+  resourceType          TransferResourceType
+  resourceName          String
+  quantity              Int
+  reason                String               @db.Text
+  status                TransferStatus       @default(PENDING)
+  approvedById          String?              @db.Uuid
+  approvedBy            User?                @relation("ApprovedTransfers", fields: [approvedById], references: [id])
+  rejectionReason       String?              @db.Text
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@index([sourceHospitalId])
+  @@index([destinationHospitalId])
+  @@index([status])
+}
+
+model PatientReferral {
+  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId             String           @db.Uuid
+  patient               Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  sourceHospitalId      String           @db.Uuid
+  sourceHospital        Hospital         @relation("SourceReferrals", fields: [sourceHospitalId], references: [id], onDelete: Cascade)
+  destinationHospitalId String           @db.Uuid
+  destinationHospital   Hospital         @relation("DestinationReferrals", fields: [destinationHospitalId], references: [id], onDelete: Cascade)
+  reason                String           // e.g. Lack of Beds, Doctors, Diagnostics, Medicines, ICU
+  status                String           @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  distanceKm            Float
+  etaMinutes            Int
+  referredById          String           @db.Uuid
+  referredBy            Doctor           @relation(fields: [referredById], references: [id])
+  notes                 String?          @db.Text
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([patientId])
+  @@index([sourceHospitalId])
+  @@index([destinationHospitalId])
+}
+
+enum AmbulanceStatus {
+  AVAILABLE
+  DISPATCHED
+  MAINTENANCE
+  OFF_DUTY
+}
+
+model Ambulance {
+  id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  driverName         String
+  driverPhone        String
+  vehicleNumber      String          @unique
+  latitude           Float
+  longitude          Float
+  status             AmbulanceStatus @default(AVAILABLE)
+  fuelLevel          Float           // 0 to 100 percentage
+  
+  hospitalId         String          @db.Uuid
+  hospital           Hospital        @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  activeEmergencyId  String?         @db.Uuid @unique
+  activeEmergency    Emergency?      @relation("ActiveAmbulance", fields: [activeEmergencyId], references: [id])
+  
+  patientPickupLat   Float?
+  patientPickupLon   Float?
+  etaMinutes         Int?
+  
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([hospitalId])
+  @@index([status])
+}
+
+
+

@@ -3,13 +3,12 @@ import { useAuth } from '../../context/AuthContext';
 import { getPatientProfile } from '../../api/patient.api';
 import { Activity, Calendar, Zap, Heart, QrCode, Beaker, Loader2 } from 'lucide-react';
 import TopNavBar from '../../components/layout/TopNavBar';
-import EmergencySOSModal from '../../components/patient/EmergencySOSModal';
+
 
 const PatientOverview: React.FC = () => {
   const { user } = useAuth(); // GET THE LOGGED IN USER
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isSOSOpen, setIsSOSOpen] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -70,12 +69,6 @@ const PatientOverview: React.FC = () => {
              <button className="flex items-center gap-2 px-8 py-3.5 bg-[#00488d] text-white rounded-2xl font-bold shadow-lg shadow-blue-100 hover:brightness-110 transition-all">
                 <Calendar size={18} /> Book Appointment
              </button>
-             <button 
-                onClick={() => setIsSOSOpen(true)}
-                className="flex items-center gap-2 px-8 py-3.5 bg-red-600 text-white rounded-2xl font-bold shadow-lg shadow-red-100 hover:bg-red-700 transition-all"
-             >
-                <Zap size={18} fill="white" /> SOS / Emergency
-             </button>
           </div>
         </section>
 
@@ -126,7 +119,6 @@ const PatientOverview: React.FC = () => {
         </div>
       </main>
 
-      <EmergencySOSModal isOpen={isSOSOpen} onClose={() => setIsSOSOpen(false)} />
     </div>
   );
 };

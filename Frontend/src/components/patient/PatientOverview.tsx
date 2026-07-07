@@ -6,12 +6,12 @@ import {
   Pill, Stethoscope, Clock, Bell 
 } from 'lucide-react';
 import TopNavBar from '../../components/layout/TopNavBar';
-import EmergencySOSModal from '../../components/patient/EmergencySOSModal';
+
 
 const PatientOverview: React.FC = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
-  const [isSOSOpen, setIsSOSOpen] = useState(false);
+
 
   useEffect(() => {
     getPatientProfile().then((data) => {
@@ -33,12 +33,9 @@ const PatientOverview: React.FC = () => {
         </section>
 
         {/* Quick Actions */}
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <button className="flex items-center justify-center gap-3 bg-[#00488d] text-white py-6 rounded-2xl font-bold shadow-lg hover:brightness-110 transition-all">
             <Calendar size={20} /> Book Appointment
-          </button>
-          <button onClick={() => setIsSOSOpen(true)} className="flex items-center justify-center gap-3 bg-[#ba1a1a] text-white py-6 rounded-2xl font-bold shadow-lg hover:brightness-110 transition-all">
-            <Zap size={20} /> SOS / Emergency
           </button>
           <button className="flex items-center justify-center gap-3 border border-[#00488d] text-[#00488d] py-6 rounded-2xl font-bold hover:bg-blue-50 transition-all">
             <FlaskConical size={20} /> Laboratory Results
@@ -61,11 +58,10 @@ const PatientOverview: React.FC = () => {
                 { label: "Height", val: `${profile?.height || 175} cm` },
                 { label: "Weight", val: `${profile?.weight || 70} kg` },
                 { label: "BMI", val: profile?.bmi || "22.5" },
-                { label: "Emergency", val: "Ready", color: "text-green-600" }
               ].map((item, i) => (
                 <div key={i} className="p-4 bg-[#edeeef] rounded-2xl">
                   <p className="text-[10px] font-black uppercase text-gray-500">{item.label}</p>
-                  <p className={`text-lg font-bold ${item.color || 'text-gray-800'}`}>{item.val}</p>
+                  <p className="text-lg font-bold text-gray-800">{item.val}</p>
                 </div>
               ))}
             </div>
@@ -107,7 +103,6 @@ const PatientOverview: React.FC = () => {
         </div>
       </main>
 
-      <EmergencySOSModal isOpen={isSOSOpen} onClose={() => setIsSOSOpen(false)} />
     </div>
   );
 };

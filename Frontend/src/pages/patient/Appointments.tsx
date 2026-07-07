@@ -422,7 +422,7 @@ const Appointments: React.FC = () => {
       {/* Book Appointment Modal */}
       {isBookingOpen && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-md text-on-surface">
-          <div className="bg-white rounded-lg w-full max-w-md p-xl custom-shadow animate-in slide-in-from-bottom duration-300 relative text-on-surface">
+          <div className="bg-white rounded-lg w-full max-w-md p-xl custom-shadow animate-in slide-in-from-bottom duration-300 relative text-on-surface max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-xl">
               <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Book Appointment</h2>
               <button 

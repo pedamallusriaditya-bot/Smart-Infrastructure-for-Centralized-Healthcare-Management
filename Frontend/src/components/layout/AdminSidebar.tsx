@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCheck, CalendarDays, Siren } from 'lucide-react';
+import { LayoutDashboard, Users, UserCheck, CalendarDays } from 'lucide-react';
 
 const AdminSidebar: React.FC = () => {
   const location = useLocation();
@@ -9,7 +9,6 @@ const AdminSidebar: React.FC = () => {
     { label: 'System Overview', path: '/admin/dashboard', icon: <LayoutDashboard size={18}/> },
     { label: 'Medical Board', path: '/admin/doctors/pending', icon: <UserCheck size={18}/> },
     { label: 'Patient Master', path: '/admin/staff', icon: <Users size={18}/> },
-    { label: 'Emergency Control', path: '/admin/emergency', icon: <Siren size={18}/>, alert: true },
   ];
 
   return (
@@ -19,7 +18,7 @@ const AdminSidebar: React.FC = () => {
       </div>
       <nav className="flex-1 space-y-2">
         {menuItems.map(item => (
-          <Link key={item.path} to={item.path} className={`flex items-center gap-3 p-3.5 rounded-2xl text-sm font-bold transition-all ${location.pathname === item.path ? 'bg-blue-50 text-blue-900 border border-blue-100 shadow-sm' : 'text-slate-500 hover:bg-slate-50'} ${item.alert ? 'text-red-500' : ''}`}>
+          <Link key={item.path} to={item.path} className={`flex items-center gap-3 p-3.5 rounded-2xl text-sm font-bold transition-all ${location.pathname === item.path ? 'bg-blue-50 text-blue-900 border border-blue-100 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
              {item.icon} {item.label}
           </Link>
         ))}
