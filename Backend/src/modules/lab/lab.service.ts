@@ -136,7 +136,11 @@ export class LabService {
         aiSummary: aiInsights.summary,
         isAbnormal: aiInsights.isAbnormal,
         flaggedValues: aiInsights.flaggedFields as Prisma.InputJsonValue,
-        aiRecommendations: aiInsights.recommendations,
+        aiRecommendations: Array.isArray(aiInsights.recommendations)
+          ? aiInsights.recommendations.join("\n")
+          : typeof aiInsights.recommendations === 'string'
+          ? aiInsights.recommendations
+          : null,
         medicalRecordId: medicalRecord.id
       };
 
