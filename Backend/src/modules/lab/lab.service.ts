@@ -98,8 +98,7 @@ export class LabService {
   async fulfillOrder(userUuid: string, orderId: string, payload: any, requestId: string) {
     const order = await prisma.labOrder.findUnique({ where: { id: orderId } });
     
-    const allowedStatuses: LabTestStatus[] = [LabTestStatus.ORDERED, LabTestStatus.SAMPLE_RECEIVED, LabTestStatus.PROCESSING];
-    if (!order || !allowedStatuses.includes(order.status)) {
+    if (!order || order.status !== LabTestStatus.PROCESSING) {
       logger.error("LIS: Fulfillment attempt on unready order", { requestId, orderId, status: order?.status });
       throw new Error("ORDER_MUST_BE_PROCESSING_TO_FULFILL");
     }
@@ -116,16 +115,29 @@ export class LabService {
         where: { labOrderId: orderId }
       });
 
+      // 1. Create Patient Longitudinal Record (Medical Record)
+      const medicalRecord = await tx.medicalRecord.create({
+        data: {
+          patientId: order.patientId,
+          doctorId: order.doctorId,
+          diagnosis: `Lab Complete: ${order.testName}`,
+          notes: `Automated Link: ${payload.fileUrl}. System detected abnormality: ${aiInsights.isAbnormal ? 'YES' : 'NO'}`
+        }
+      });
+
+      // 2. Prepare Report Data with medicalRecordId and technicianNotes
       const reportData = {
         technicianId: tech.id,
         resultsData: payload.resultsData as Prisma.InputJsonValue,
         sampleId: payload.sampleId,
         fileUrl: payload.fileUrl,
         attachments: payload.attachments,
+        technicianNotes: payload.technicianNotes,
         aiSummary: aiInsights.summary,
         isAbnormal: aiInsights.isAbnormal,
         flaggedValues: aiInsights.flaggedFields as Prisma.InputJsonValue,
-        aiRecommendations: aiInsights.recommendations
+        aiRecommendations: aiInsights.recommendations,
+        medicalRecordId: medicalRecord.id
       };
 
       let report;
@@ -143,20 +155,10 @@ export class LabService {
         });
       }
 
-      // 2. Mark parent Order as COMPLETED
+      // 3. Mark parent Order as COMPLETED
       await tx.labOrder.update({ 
         where: { id: orderId }, 
         data: { status: LabTestStatus.COMPLETED } 
-      });
-
-      // 3. Integrate results into Patient Longitudinal Record
-      await tx.medicalRecord.create({
-        data: {
-          patientId: order.patientId,
-          doctorId: order.doctorId,
-          diagnosis: `Lab Complete: ${order.testName}`,
-          notes: `Automated Link: ${payload.fileUrl}. System detected abnormality: ${aiInsights.isAbnormal ? 'YES' : 'NO'}`
-        }
       });
 
       logger.info("LIS: Fulfilling transaction success", { requestId, reportId: report.id });
@@ -264,7 +266,14 @@ export class LabService {
     const [reports, total] = await prisma.$transaction([
       prisma.labReport.findMany({ 
         where, 
-        include: { labOrder: true }, 
+        include: { 
+          labOrder: {
+            include: {
+              patient: true,
+              doctor: true
+            }
+          }
+        }, 
         skip, 
         take: limit, 
         orderBy: { createdAt: 'desc' } 

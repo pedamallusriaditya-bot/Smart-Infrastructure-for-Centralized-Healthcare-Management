@@ -195,6 +195,37 @@ GAIS/
 * **Actions**: Activate pending hospitals, verify in-app alerts, approve/reject logistics transfers.
 * **APIs**: `/app-admin/dashboard/stats`, `/app-admin/performance`, `/app-admin/redistribution/status`.
 
+### Doctor Dashboard
+* **Purpose**: General clinical and consult management for Physicians.
+* **Widgets**: Active appointment list, queue monitoring, attendance clock interface.
+* **Actions**: Check-in/out attendance shifts, consult patients, issue digital prescriptions, order diagnostic laboratory tests, request inpatient ward admissions.
+* **APIs**: `/v1/appointments` (GET), `/v1/appointments/:id/status` (PATCH), `/v1/prescriptions/create` (POST), `/v1/lab/order` (POST), `/v1/admissions/admit` (POST), `/v1/attendance/check-in` (POST).
+
+### Patient Dashboard
+* **Purpose**: Self-service clinical history and appointments coordinator for Patients.
+* **Widgets**: Vital details health card (Blood group, Age, BMI), next upcoming appointment banner, latest lab test results card, active prescriptions list, assigned primary physician card, AI Health Insights panel.
+* **Actions**: Book consultations, view laboratory report detail cards, generate temporary secure Medical QR, chat with Multilingual AI Assistant.
+* **APIs**: `/patients/profile` (GET), `/patients/qr` (GET), `/appointments` (POST), `/admissions/my-status` (GET), `/timeline/timeline/:patientId` (GET), `/lab/reports` (GET).
+
+### Nurse Dashboard
+* **Purpose**: Active inpatient ward supervision and bedside treatment logging.
+* **Widgets**: Admitted patients list (room, bed, primary doctor, diagnosis reason), active medicine prescription list.
+* **Actions**: Record patient vital signs (Blood Pressure, Heart Rate, Temperature, Respiratory Rate), log nursing observation notes, execute medication administration records (MAR).
+* **APIs**: `/v1/nurse/profile` (GET), `/v1/nurse/patients` (GET), `/v1/nurse/prescriptions` (GET), `/v1/nurse/patients/:patientId/history` (GET), `/v1/nurse/administer` (POST), `/v1/nurse/vitals` (POST), `/v1/nurse/notes` (POST).
+
+### Pharmacist Dashboard
+* **Purpose**: Pharmacy inventory logistics and drug dispensing workflow.
+* **Widgets**: Stock level monitors, pending prescription dispense requests, low stock thresholds alerts.
+* **Actions**: Verify and dispense doctor prescriptions, cancel drug orders, log batch restock acquisitions (batch numbers, expiry dates, quantities).
+* **APIs**: `/v1/pharmacy/profile` (GET), `/v1/pharmacy/inventory` (GET), `/v1/pharmacy/summary` (GET), `/v1/pharmacy/prescriptions` (GET), `/v1/pharmacy/dispense` (POST), `/v1/pharmacy/cancel` (POST), `/v1/pharmacy/restock` (POST).
+
+### Lab Technician Dashboard (LIS)
+* **Purpose**: Sample diagnostic testing registry and analytics tracker.
+* **Widgets**: Searchable pending and processed lab order cards (High/STAT/Normal priority indicators).
+* **Actions**: Log clinical sample results (glucose, cholesterol, hemoglobin, custom parameters), submit laboratory report files, add technician analysis comments, trigger AI summary generation.
+* **APIs**: `/lab/reports` (GET), `/lab/reports/:labOrderId` (POST).
+
+
 ---
 
 # 9. Workflow Documentation

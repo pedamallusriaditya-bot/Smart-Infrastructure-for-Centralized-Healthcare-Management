@@ -31,7 +31,7 @@ function handleLabError(res: Response, req: Request, error: any, fallback: strin
     return errorResponse(res, "Access Denied: Resource outside your scope", 403);
   }
 
-  if (error.message === "ACTIVE_ORDER_EXISTS" || error.message === "INVALID_STATUS_TRANSITION") {
+  if (error.message === "ACTIVE_ORDER_EXISTS" || error.message === "INVALID_STATUS_TRANSITION" || error.message === "ORDER_MUST_BE_PROCESSING_TO_FULFILL") {
     return errorResponse(res, error.message, 400);
   }
 

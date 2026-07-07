@@ -67,6 +67,16 @@ const LISDashboard: React.FC = () => {
     setIsSubmitOpen(true);
   };
 
+  const handleUpdateStatus = async (orderId: string, nextStatus: string) => {
+    try {
+      await axiosInstance.patch(`/lab/orders/${orderId}/status`, { status: nextStatus });
+      loadLabData();
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to advance laboratory workflow status: " + (err.response?.data?.message || err.message));
+    }
+  };
+
   const handleLabReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReport) return;
@@ -369,17 +379,49 @@ const LISDashboard: React.FC = () => {
                             <td className="px-lg py-md">{getPriorityBadge(priority)}</td>
                             <td className="px-lg py-md font-body-md text-body-md">{requestTime}</td>
                             <td className="px-lg py-md">
-                              {rep.labOrder?.status === 'ORDERED' || rep.labOrder?.status === 'PROCESSING' ? (
+                              {rep.labOrder?.status === 'ORDERED' && (
+                                <button 
+                                  onClick={() => handleUpdateStatus(rep.labOrderId, 'SAMPLE_RECEIVED')}
+                                  className="px-md py-xs bg-amber-600 text-white rounded font-label-lg text-label-lg hover:opacity-90 transition-all cursor-pointer shadow-sm inline-flex items-center gap-1"
+                                >
+                                  <span className="material-symbols-outlined text-xs">biotech</span>
+                                  Receive Sample
+                                </button>
+                              )}
+                              {rep.labOrder?.status === 'SAMPLE_RECEIVED' && (
+                                <button 
+                                  onClick={() => handleUpdateStatus(rep.labOrderId, 'PROCESSING')}
+                                  className="px-md py-xs bg-blue-600 text-white rounded font-label-lg text-label-lg hover:opacity-90 transition-all cursor-pointer shadow-sm inline-flex items-center gap-1"
+                                >
+                                  <span className="material-symbols-outlined text-xs">settings_ethernet</span>
+                                  Process Sample
+                                </button>
+                              )}
+                              {rep.labOrder?.status === 'PROCESSING' && (
                                 <button 
                                   onClick={() => handleOpenSubmitModal(rep)}
-                                  className="px-lg py-xs bg-primary text-on-primary rounded font-label-lg text-label-lg hover:opacity-90 transition-all cursor-pointer shadow-sm"
+                                  className="px-md py-xs bg-primary text-on-primary rounded font-label-lg text-label-lg hover:opacity-90 transition-all cursor-pointer shadow-sm inline-flex items-center gap-1"
                                 >
-                                  Start Test
+                                  <span className="material-symbols-outlined text-xs">edit_note</span>
+                                  Input Results
                                 </button>
-                              ) : (
+                              )}
+                              {rep.labOrder?.status === 'COMPLETED' && (
                                 <span className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200 font-bold inline-flex items-center gap-1">
                                   <span className="material-symbols-outlined text-xs">check_circle</span>
                                   Completed
+                                </span>
+                              )}
+                              {rep.labOrder?.status === 'VERIFIED' && (
+                                <span className="text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200 font-bold inline-flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-xs">verified</span>
+                                  Verified
+                                </span>
+                              )}
+                              {rep.labOrder?.status === 'CANCELLED' && (
+                                <span className="text-xs text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200 font-bold inline-flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-xs">cancel</span>
+                                  Cancelled
                                 </span>
                               )}
                             </td>

@@ -95,6 +95,22 @@ const DoctorDashboard: React.FC = () => {
   const [patientReferralHistory, setPatientReferralHistory] = useState<any[]>([]);
   const [patientReferralHistoryLoading, setPatientReferralHistoryLoading] = useState(false);
 
+  // Lab Reviews State
+  const [labReviews, setLabReviews] = useState<any[]>([]);
+  const [isSignOffOpen, setIsSignOffOpen] = useState(false);
+  const [selectedReviewReport, setSelectedReviewReport] = useState<any>(null);
+  const [doctorRemarks, setDoctorRemarks] = useState("");
+  const [signOffLoading, setSignOffLoading] = useState(false);
+
+  // Place Lab Order State
+  const [isLabOrderOpen, setIsLabOrderOpen] = useState(false);
+  const [selectedApptForLabOrder, setSelectedApptForLabOrder] = useState<any>(null);
+  const [labOrderTestName, setLabOrderTestName] = useState("Complete Blood Count (CBC)");
+  const [labOrderCategory, setLabOrderCategory] = useState("HEMATOLOGY");
+  const [labOrderPriority, setLabOrderPriority] = useState("NORMAL");
+  const [labOrderClinicalNotes, setLabOrderClinicalNotes] = useState("");
+  const [labOrderLoading, setLabOrderLoading] = useState(false);
+
 
   // Load departments and rooms on hospital selection change
   useEffect(() => {
@@ -357,6 +373,35 @@ const DoctorDashboard: React.FC = () => {
     return newMetrics;
   });
 
+  const handleCreateLabOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedApptForLabOrder || !labOrderTestName || !labOrderCategory) {
+      alert("Please complete all required fields.");
+      return;
+    }
+    setLabOrderLoading(true);
+    try {
+      await axiosInstance.post('/lab/orders', {
+        patientId: selectedApptForLabOrder.patientId,
+        appointmentId: selectedApptForLabOrder.id,
+        testName: labOrderTestName,
+        category: labOrderCategory,
+        priority: labOrderPriority,
+        clinicalNotes: labOrderClinicalNotes
+      });
+      alert("Laboratory test successfully ordered! LIS queue updated.");
+      setIsLabOrderOpen(false);
+      setLabOrderTestName("Complete Blood Count (CBC)");
+      setLabOrderClinicalNotes("");
+      loadDashboardData();
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to initiate lab order: " + (err.response?.data?.message || err.message));
+    } finally {
+      setLabOrderLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('doctor_wellness_metrics');
     logout();
@@ -370,13 +415,14 @@ const DoctorDashboard: React.FC = () => {
     setLoading(true);
     setErrorState(null);
     try {
-      const [profileRes, apptsRes, emergRes, todayAtt, summaryAtt, hospRes] = await Promise.all([
+      const [profileRes, apptsRes, emergRes, todayAtt, summaryAtt, hospRes, labRes] = await Promise.all([
         axiosInstance.get('/doctors/profile'),
         axiosInstance.get('/appointments').catch(() => ({ data: { data: [] } })),
         axiosInstance.get('/emergencies').catch(() => ({ data: { data: [] } })),
         getMyTodayAttendance().catch(() => null),
         getMyAttendanceSummary().catch(() => null),
-        axiosInstance.get('/hospitals').catch(() => ({ data: { data: [] } }))
+        axiosInstance.get('/hospitals').catch(() => ({ data: { data: [] } })),
+        axiosInstance.get('/lab/reports', { params: { status: 'COMPLETED' } }).catch(() => ({ data: { data: { reports: [] } } }))
       ]);
       const prof = profileRes.data.data;
       setDoctorProfile(prof);
@@ -384,6 +430,7 @@ const DoctorDashboard: React.FC = () => {
       setEmergencies(emergRes.data.data || []);
       setAttendanceToday(todayAtt);
       setAttendanceSummary(summaryAtt);
+      setLabReviews(labRes.data.data?.reports || []);
       
       const hospList = hospRes.data.data || [];
       setHospitals(hospList);
@@ -578,7 +625,21 @@ const DoctorDashboard: React.FC = () => {
                 Off Duty
               </button>
             </div>
-            <button className="bg-primary text-on-primary px-lg py-sm rounded shadow-md hover:bg-primary-container transition-all flex items-center gap-sm cursor-pointer">
+            <button 
+              onClick={() => {
+                if (scheduledQueue.length === 0) {
+                  alert("You do not have any active appointments to place lab requests for.");
+                  return;
+                }
+                setSelectedApptForLabOrder(scheduledQueue[0]);
+                setLabOrderTestName("Complete Blood Count (CBC)");
+                setLabOrderClinicalNotes("");
+                setLabOrderCategory("HEMATOLOGY");
+                setLabOrderPriority("NORMAL");
+                setIsLabOrderOpen(true);
+              }}
+              className="bg-primary text-on-primary px-lg py-sm rounded shadow-md hover:bg-primary-container transition-all flex items-center gap-sm cursor-pointer"
+            >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>add</span>
               <span className="font-label-lg">Create New Lab Request</span>
             </button>
@@ -605,7 +666,7 @@ const DoctorDashboard: React.FC = () => {
               <span className="text-label-md text-secondary uppercase tracking-wider">Pending Lab Reviews</span>
               <span className="material-symbols-outlined text-secondary">biotech</span>
             </div>
-            <div className="text-headline-lg font-bold text-on-surface mb-xs">0</div>
+            <div className="text-headline-lg font-bold text-on-surface mb-xs">{labReviews.length}</div>
             <div className="flex items-center gap-xs text-on-surface-variant text-label-md">
               <span>Priority reviews identified</span>
             </div>
@@ -935,10 +996,43 @@ const DoctorDashboard: React.FC = () => {
                 <h2 className="font-title-lg text-title-lg">Urgent Lab Reviews</h2>
                 <span className="material-symbols-outlined">notification_important</span>
               </div>
-              <div className="p-lg space-y-md">
-                <div className="text-center py-6 text-gray-400">
-                  No pending critical lab orders require physician sign-off.
-                </div>
+              <div className="p-lg space-y-md max-h-96 overflow-y-auto">
+                {labReviews.length === 0 ? (
+                  <div className="text-center py-6 text-gray-400 text-sm">
+                    No pending critical lab orders require physician sign-off.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-outline-variant text-left">
+                    {labReviews.map((rep) => {
+                      const patName = rep.labOrder?.patient 
+                        ? `${rep.labOrder.patient.firstName} ${rep.labOrder.patient.lastName}` 
+                        : "CareHive Patient";
+                      return (
+                        <div key={rep.id} className="py-md flex flex-col md:flex-row justify-between items-start md:items-center gap-sm">
+                          <div className="text-left">
+                            <h4 className="font-bold text-sm text-on-surface">{rep.labOrder?.testName}</h4>
+                            <p className="text-xs text-on-surface-variant">Patient: {patName} | Priority: {rep.labOrder?.priority}</p>
+                            {rep.isAbnormal && (
+                              <span className="text-[10px] bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded border border-red-200 mt-1 inline-block">
+                                ABNORMAL VALUES DETECTED
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedReviewReport(rep);
+                              setDoctorRemarks("");
+                              setIsSignOffOpen(true);
+                            }}
+                            className="bg-primary text-on-primary text-xs px-md py-2 rounded-lg font-bold transition-all cursor-pointer shadow-sm hover:opacity-90 shrink-0"
+                          >
+                            Review & Sign-off
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </section>
           </div>
@@ -1633,6 +1727,251 @@ const DoctorDashboard: React.FC = () => {
               </div>
 
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review & Sign-off Modal */}
+      {isSignOffOpen && selectedReviewReport && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-md text-on-surface animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg w-full max-w-2xl p-xl shadow-2xl relative text-on-surface max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-xl border-b border-outline-variant pb-md">
+              <h2 className="text-2xl font-bold text-[#00488d] flex items-center gap-2">
+                <span className="material-symbols-outlined text-3xl">rate_review</span>
+                Review Diagnostic Report
+              </h2>
+              <button 
+                className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-slate-100 p-1 rounded-full" 
+                onClick={() => setIsSignOffOpen(false)}
+              >
+                close
+              </button>
+            </div>
+            
+            <div className="space-y-lg text-left">
+              <div className="grid grid-cols-2 gap-md bg-slate-50 p-md rounded-lg text-sm mb-md">
+                <div>
+                  <span className="font-semibold text-on-surface-variant">Patient:</span> {selectedReviewReport.labOrder?.patient ? `${selectedReviewReport.labOrder.patient.firstName} ${selectedReviewReport.labOrder.patient.lastName}` : "CareHive Patient"}
+                </div>
+                <div>
+                  <span className="font-semibold text-on-surface-variant">Test Name:</span> {selectedReviewReport.labOrder?.testName || "Diagnostic Analysis"}
+                </div>
+                <div>
+                  <span className="font-semibold text-on-surface-variant">Technician Notes:</span> {selectedReviewReport.technicianNotes || "None provided"}
+                </div>
+                <div>
+                  <span className="font-semibold text-on-surface-variant">Priority:</span> {selectedReviewReport.labOrder?.priority || "NORMAL"}
+                </div>
+              </div>
+
+              {/* Raw Values Table */}
+              <h3 className="font-bold text-[#00488d] text-lg border-b border-slate-100 pb-xs">Raw Values</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100">
+                      <th className="p-2 border">Parameter</th>
+                      <th className="p-2 border">Result</th>
+                      <th className="p-2 border">Reference Range</th>
+                      <th className="p-2 border">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(selectedReviewReport.resultsData || {}).map(([key, dataVal]: any) => (
+                      <tr key={key} className="hover:bg-slate-50">
+                        <td className="p-2 border font-semibold uppercase">{key}</td>
+                        <td className="p-2 border font-mono font-bold">{dataVal?.value || dataVal || "N/A"} {dataVal?.unit || ""}</td>
+                        <td className="p-2 border text-gray-500 font-mono">{dataVal?.range || "N/A"}</td>
+                        <td className="p-2 border text-gray-600">{dataVal?.remarks || "N/A"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* AI Clinical Insights */}
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-md space-y-xs">
+                <div className="flex items-center gap-xs text-primary font-bold text-sm">
+                  <span className="material-symbols-outlined">psychology</span>
+                  <span>AI CLINICAL DECISION SUPPORT SYSTEM (Gemini Flash)</span>
+                </div>
+                <div className="space-y-xs text-xs text-on-surface">
+                  <p><span className="font-bold">Summary:</span> {selectedReviewReport.aiSummary || "No AI summary available."}</p>
+                  <div>
+                    <span className="font-bold">Recommendations:</span>
+                    <ul className="list-disc pl-4 mt-0.5">
+                      {Array.isArray(selectedReviewReport.aiRecommendations) 
+                        ? selectedReviewReport.aiRecommendations.map((rec: string, idx: number) => <li key={idx}>{rec}</li>)
+                        : (selectedReviewReport.aiRecommendations?.split("\n") || ["No AI recommendations available."]).map((rec: string, idx: number) => <li key={idx}>{rec}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarks Form */}
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (doctorRemarks.length < 5) {
+                  alert("Sign-off remarks are too short for a clinical record");
+                  return;
+                }
+                setSignOffLoading(true);
+                try {
+                  await axiosInstance.patch(`/lab/verify/${selectedReviewReport.id}`, { doctorRemarks });
+                  alert("Clinician sign-off complete. Lab order status updated to VERIFIED.");
+                  setIsSignOffOpen(false);
+                  loadDashboardData();
+                } catch (err: any) {
+                  console.error(err);
+                  alert("Verification failed: " + (err.response?.data?.message || err.message));
+                } finally {
+                  setSignOffLoading(false);
+                }
+              }} className="space-y-md pt-sm">
+                <div className="space-y-xs">
+                  <label className="text-sm font-bold text-on-surface-variant">Clinician Sign-off Remarks</label>
+                  <textarea 
+                    value={doctorRemarks}
+                    onChange={(e) => setDoctorRemarks(e.target.value)}
+                    placeholder="Enter clinical conclusions, follow-up advice, diagnosis confirmation..."
+                    className="w-full border border-outline rounded p-md font-body-md text-body-md outline-none transition-all text-on-surface bg-white h-24 resize-none"
+                    required
+                    minLength={5}
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={signOffLoading}
+                  className="w-full bg-[#00488d] hover:bg-[#00366b] text-white py-lg rounded-lg font-bold shadow transition-all flex items-center justify-center gap-sm disabled:opacity-50 cursor-pointer"
+                >
+                  {signOffLoading ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined">verified</span>
+                      Authorize & Sign-off Report
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Place Lab Order Modal */}
+      {isLabOrderOpen && selectedApptForLabOrder && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-md text-on-surface animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg w-full max-w-md p-xl shadow-2xl relative text-on-surface max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-xl">
+              <h2 className="text-2xl font-bold text-[#00488d] flex items-center gap-2">
+                <span className="material-symbols-outlined text-3xl">add_circle</span>
+                Order Diagnostic Lab Test
+              </h2>
+              <button 
+                className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-slate-100 p-1 rounded-full" 
+                onClick={() => setIsLabOrderOpen(false)}
+              >
+                close
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateLabOrderSubmit} className="space-y-lg text-left">
+              <div>
+                <label className="text-sm font-bold text-on-surface-variant">Select Patient (Active Consultation Queue)</label>
+                <select 
+                  value={selectedApptForLabOrder.id}
+                  onChange={(e) => {
+                    const appt = scheduledQueue.find(a => a.id === e.target.value);
+                    if (appt) setSelectedApptForLabOrder(appt);
+                  }}
+                  className="w-full border border-outline rounded p-md font-body-md text-body-md outline-none transition-all text-on-surface bg-white"
+                  required
+                >
+                  {scheduledQueue.map(appt => (
+                    <option key={appt.id} value={appt.id}>
+                      {appt.patient?.firstName} {appt.patient?.lastName} ({appt.reason})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-xs">
+                <label className="text-sm font-bold text-on-surface-variant">Test Name</label>
+                <select
+                  value={labOrderTestName}
+                  onChange={(e) => setLabOrderTestName(e.target.value)}
+                  className="w-full border border-outline rounded p-md font-body-md text-body-md outline-none transition-all text-on-surface bg-white"
+                  required
+                >
+                  <option value="Complete Blood Count (CBC)">Complete Blood Count (CBC)</option>
+                  <option value="Lipid Profile">Lipid Profile</option>
+                  <option value="Fasting Blood Sugar">Fasting Blood Sugar</option>
+                  <option value="Thyroid Panel (T3, T4, TSH)">Thyroid Panel (T3, T4, TSH)</option>
+                  <option value="Kidney Function Test (KFT)">Kidney Function Test (KFT)</option>
+                  <option value="Liver Function Test (LFT)">Liver Function Test (LFT)</option>
+                  <option value="ECG (Electrocardiogram)">ECG (Electrocardiogram)</option>
+                  <option value="Urinalysis">Urinalysis</option>
+                </select>
+              </div>
+
+              <div className="space-y-xs">
+                <label className="text-sm font-bold text-on-surface-variant">Clinical Category</label>
+                <select
+                  value={labOrderCategory}
+                  onChange={(e) => setLabOrderCategory(e.target.value)}
+                  className="w-full border border-outline rounded p-md font-body-md text-body-md outline-none transition-all text-on-surface bg-white"
+                  required
+                >
+                  <option value="HEMATOLOGY">HEMATOLOGY</option>
+                  <option value="BIOCHEMISTRY">BIOCHEMISTRY</option>
+                  <option value="MICROBIOLOGY">MICROBIOLOGY</option>
+                  <option value="PATHOLOGY">PATHOLOGY</option>
+                  <option value="RADIOLOGY">RADIOLOGY</option>
+                  <option value="IMMUNOLOGY">IMMUNOLOGY</option>
+                </select>
+              </div>
+
+              <div className="space-y-xs">
+                <label className="text-sm font-bold text-on-surface-variant">Priority Level</label>
+                <select
+                  value={labOrderPriority}
+                  onChange={(e) => setLabOrderPriority(e.target.value)}
+                  className="w-full border border-outline rounded p-md font-body-md text-body-md outline-none transition-all text-on-surface bg-white"
+                  required
+                >
+                  <option value="NORMAL">NORMAL (Routine Analysis)</option>
+                  <option value="URGENT">URGENT (Accelerated processing)</option>
+                  <option value="EMERGENCY">EMERGENCY (Immediate attention)</option>
+                </select>
+              </div>
+
+              <div className="space-y-xs">
+                <label className="text-sm font-bold text-on-surface-variant">Clinical Indications / Notes</label>
+                <textarea 
+                  value={labOrderClinicalNotes}
+                  onChange={(e) => setLabOrderClinicalNotes(e.target.value)}
+                  placeholder="Describe patient symptoms, specific values of interest, or scan areas..."
+                  className="w-full border border-outline rounded p-md font-body-md text-body-md outline-none transition-all text-on-surface bg-white h-20 resize-none"
+                />
+              </div>
+
+              <button 
+                type="submit"
+                disabled={labOrderLoading}
+                className="w-full bg-[#00488d] hover:bg-[#00366b] text-white py-lg rounded-lg font-bold shadow transition-all flex items-center justify-center gap-sm disabled:opacity-50 cursor-pointer"
+              >
+                {labOrderLoading ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined">biotech</span>
+                    Issue Lab Test Request
+                  </>
+                )}
+              </button>
+            </form>
           </div>
         </div>
       )}
