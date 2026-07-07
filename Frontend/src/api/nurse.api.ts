@@ -1,23 +1,23 @@
 import axiosInstance from './axiosInstance';
 
 export const getNurseProfile = async () => {
-  const response = await axiosInstance.get('/v1/nurse/profile');
+  const response = await axiosInstance.get('/nurse/profile');
   return response.data.data;
 };
 
 export const getNursePatients = async () => {
-  const response = await axiosInstance.get('/v1/nurse/patients');
+  const response = await axiosInstance.get('/nurse/patients');
   return response.data.data;
 };
 
 export const getNursePrescriptions = async (patientId?: string) => {
-  const url = patientId ? `/v1/nurse/prescriptions?patientId=${patientId}` : '/v1/nurse/prescriptions';
+  const url = patientId ? `/nurse/prescriptions?patientId=${patientId}` : '/nurse/prescriptions';
   const response = await axiosInstance.get(url);
   return response.data.data;
 };
 
 export const getMedicationHistory = async (patientId: string) => {
-  const response = await axiosInstance.get(`/v1/nurse/patients/${patientId}/history`);
+  const response = await axiosInstance.get(`/nurse/patients/${patientId}/history`);
   return response.data.data;
 };
 
@@ -32,7 +32,7 @@ export interface AdministerData {
 }
 
 export const administerMedication = async (data: AdministerData) => {
-  const response = await axiosInstance.post('/v1/nurse/administer', data);
+  const response = await axiosInstance.post('/nurse/administer', data);
   return response.data.data;
 };
 
@@ -45,7 +45,7 @@ export interface VitalsData {
 }
 
 export const recordVitalSigns = async (data: VitalsData) => {
-  const response = await axiosInstance.post('/v1/nurse/vitals', data);
+  const response = await axiosInstance.post('/nurse/vitals', data);
   return response.data.data;
 };
 
@@ -55,6 +55,6 @@ export interface NursingNotesData {
 }
 
 export const updateNursingNotes = async (data: NursingNotesData) => {
-  const response = await axiosInstance.post('/v1/nurse/notes', data);
+  const response = await axiosInstance.post('/nurse/notes', data);
   return response.data.data;
 };
