@@ -1,133 +1,277 @@
 # 🏥 CareHive OS
 
-> **CareHive** is a centralized, digital healthcare coordination platform designed to bridge the operational gap between isolated hospital centers and regional health administrative offices.
+> **CareHive OS** is an AI-powered centralized healthcare infrastructure platform that connects hospitals, district health administrators, laboratories, pharmacies, and medical staff through a unified digital ecosystem.
 
-In typical municipal or state healthcare frameworks, resource allocation, bed capacity, shift attendance, and disease outbreaks are monitored across disjointed communication channels (calls, spreadsheets). This leads to ambulance dispatch delays, drug stockouts, and undetected outbreak surges. 
-
-**CareHive solves these challenges** by providing real-time data integration, LIS workflows, and AI-driven clinical logistics.
+It eliminates fragmented communication by providing real-time hospital resource monitoring, centralized administration, intelligent logistics, laboratory workflows, disease surveillance, and secure clinical record management.
 
 ---
 
-## 🏛️ Project Architecture
+# 🌐 Live Demo
+
+**Frontend**
+
+https://smart-infrastructure-for-centralize.vercel.app
+
+**Backend API**
+
+https://smart-infrastructure-for-centralized.onrender.com
+
+---
+
+# 🔐 Demo Credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| 🏛️ District Administrator | `appadmin@carehive.med` | `Password@123` |
+| 🏥 Hospital Administrator | `admin.1@carehive.med` | `Admin@123` |
+| 👨‍⚕️ Doctor | `doctor.1.1@carehive.med` | `Password@123` |
+| 🧪 Lab Technician | `lab.1.1@carehive.med` | `Password@123` |
+| 💊 Pharmacist | `pharma.1.1@carehive.med` | `Password@123` |
+| 👩‍⚕️ Nurse | `nurse.1.1@carehive.med` | `Password@123` |
+
+---
+
+# 🏛️ System Architecture
 
 ```
-                                  +-----------------------+
-                                  |     CareHive Client   |
-                                  +-----------┬-----------+
-                                              │ (REST APIs)
+                                 +-------------------------+
+                                 |     React + Vite UI     |
+                                 +------------┬------------+
+                                              │
+                                        REST API (HTTPS)
+                                              │
                                               ▼
-                                  +-----------------------+
-                                  |     Express Backend   |
-                                  +-----------┬-----------+
-                                              │ (Prisma Client)
+                                 +-------------------------+
+                                 |   Express.js Backend    |
+                                 | Authentication • RBAC   |
+                                 | Business Logic          |
+                                 +------------┬------------+
+                                              │
+                                       Prisma ORM
+                                              │
                                               ▼
-                                  +-----------------------+
-                                  |  PostgreSQL Database  |
-                                  +-----------------------+
+                                 +-------------------------+
+                                 |     PostgreSQL DB       |
+                                 +-------------------------+
 ```
 
 ---
 
-## 🚀 Key Features
+# 🚀 Features
 
-* **🏥 Hospital Lifecycle & Command Center**: Activate pending hospital registrations, check dynamic regional coordinates, and monitor beds occupancy statistics.
-* **🔬 LIS (Laboratory Information System)**: End-to-end laboratory test workflow from Doctor Order ➔ Technician Sample Collection ➔ Centrifuge Processing ➔ Result Fulfillment ➔ Physician Sign-off Verification.
-* **🤖 AI Resource Logistics**: Gemini-1.5-flash CDSS that scans hospital metrics (ICU beds, blood counts) to suggest peer-to-peer logistic redistributions.
-* **📊 Disease Surveillance**: Outbreak detection algorithms with responsive SVG trend graphics monitoring TB, COVID, Dengue, Malaria, and Influenza.
-* **💬 Multilingual AI Assistant**: Floats on the patient console, translating records, appointments, and prescriptions into English, Hindi, Telugu, Tamil, Kannada, Malayalam, Marathi, or Bengali.
-* **📋 Secure Audit Trails**: Absolute verification logs documenting clinician check-ins, medication administrations, and resource transfers.
+## 🏥 Hospital Management
 
----
-
-## ⚡ Tech Stack
-
-| Layer | Technologies Used |
-| :--- | :--- |
-| **Frontend** | React, Vite, TypeScript, Tailwind CSS, Lucide Icons |
-| **Backend** | Express.js, Node.js, TypeScript |
-| **Database** | PostgreSQL |
-| **ORM** | Prisma |
-| **Gen AI** | Google Gemini 1.5 Flash (via `@google/generative-ai`) |
+- Hospital onboarding and approval workflow
+- District-level hospital monitoring
+- Bed availability tracking
+- Department management
+- Staff management
+- Role Based Access Control (RBAC)
 
 ---
 
-## ⚙️ Getting Started
+## 👨‍⚕️ Clinical Management
 
-### Prerequisites
-* [Node.js](https://nodejs.org/) (v18.x or higher)
-* [PostgreSQL](https://www.postgresql.org/) (Ensure your local/remote server is active)
-
----
-
-### 1. Backend Setup
-
-1. Navigate to the `Backend` directory:
-   ```bash
-   cd Backend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Configure the environment variables inside `.env`:
-   ```properties
-   DATABASE_URL="postgresql://<user>:<password>@<host>:<port>/<db_name>?schema=public"
-   JWT_SECRET="your-jwt-secure-secret-key"
-   PORT=5000
-   GEMINI_API_KEY="your-google-gemini-api-key"
-   ```
-4. Run Prisma migrations:
-   ```bash
-   npx prisma migrate dev
-   ```
-5. Seed the database with initial registries:
-   ```bash
-   npm run prisma:seed
-   ```
-6. Spin up the local API development server:
-   ```bash
-   npm run dev
-   ```
+- Doctor dashboard
+- Appointment scheduling
+- Patient timeline
+- Prescription management
+- Medical records
+- Admission workflow
 
 ---
 
-### 2. Frontend Setup
+## 🔬 Laboratory Information System (LIS)
 
-1. Navigate to the `Frontend` directory:
-   ```bash
-   cd ../Frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Configure target endpoints in `.env`:
-   ```properties
-   VITE_API_URL="http://localhost:5000/api/v1"
-   ```
-4. Start the Vite bundler dev server:
-   ```bash
-   npm run dev
-   ```
+- Laboratory order management
+- Sample collection
+- Sample processing
+- Result verification
+- Doctor review
+- Laboratory dashboard
 
 ---
 
-## 📁 Folder Structure
+## 💊 Pharmacy & Inventory
+
+- Medicine inventory
+- Stock monitoring
+- Prescription dispensing
+- Drug availability tracking
+- Inventory analytics
+
+---
+
+## 🤖 AI Intelligence
+
+- AI-powered inventory recommendations
+- Clinical decision support
+- Resource redistribution suggestions
+- Predictive demand analysis
+
+---
+
+## 📊 Disease Surveillance
+
+- Outbreak monitoring
+- Regional disease statistics
+- Trend visualization
+- Public health analytics
+
+---
+
+## 📈 Administration
+
+- District Administration Dashboard
+- Hospital Administration Dashboard
+- Attendance Management
+- Analytics Dashboard
+- Audit Logs
+- Referral Management
+
+---
+
+# ⚡ Tech Stack
+
+| Layer | Technology |
+|--------|------------|
+| Frontend | React, Vite, TypeScript, Tailwind CSS |
+| Backend | Node.js, Express.js, TypeScript |
+| Database | PostgreSQL |
+| ORM | Prisma |
+| Authentication | JWT |
+| AI | Google Gemini 1.5 Flash |
+| Deployment | Vercel + Render |
+
+---
+
+# 📁 Project Structure
 
 ```
-GAIS/
-├── Backend/
-│   ├── prisma/
-│   │   ├── schema.prisma        # Database model definitions
-│   │   └── seed.ts              # Seeder scripts
-│   └── src/
-│       ├── app.ts               # Express configuration
-│       ├── server.ts            # Server entrypoint
-│       └── modules/             # Modular LIS, Admin, Triage, and Attendance controllers
-├── Frontend/
-│   └── src/
-│       ├── api/                 # Axios endpoints instances
-│       ├── context/             # Global states (AuthContext)
-│       └── pages/               # Interactive portals (Lab LIS, Clinician Dashboard)
-└── docs/                        # Project Functional & Operational Audit manuals
+GAIS
+│
+├── Backend
+│   ├── prisma
+│   │   ├── schema.prisma
+│   │   └── seed.ts
+│   │
+│   └── src
+│       ├── modules
+│       ├── middleware
+│       ├── routes
+│       ├── services
+│       ├── app.ts
+│       └── server.ts
+│
+├── Frontend
+│   └── src
+│       ├── api
+│       ├── components
+│       ├── context
+│       ├── pages
+│       ├── hooks
+│       ├── utils
+│       └── App.tsx
+│
+└── docs
 ```
+
+---
+
+# ⚙️ Backend Setup
+
+```bash
+cd Backend
+
+npm install
+```
+
+Create `.env`
+
+```env
+DATABASE_URL=postgresql://<username>:<password>@<host>:5432/<database>
+
+JWT_SECRET=your-secret
+
+PORT=5000
+
+GEMINI_API_KEY=your-api-key
+```
+
+Run database migrations
+
+```bash
+npx prisma migrate dev
+```
+
+Seed demo data
+
+```bash
+npm run prisma:seed
+```
+
+Start backend
+
+```bash
+npm run dev
+```
+
+---
+
+# ⚙️ Frontend Setup
+
+```bash
+cd Frontend
+
+npm install
+```
+
+Create `.env`
+
+```env
+VITE_API_URL=http://localhost:5000/api/v1
+```
+
+Run
+
+```bash
+npm run dev
+```
+
+---
+
+# 🔒 Security
+
+- JWT Authentication
+- Role Based Access Control
+- Password Hashing
+- Request Validation
+- Audit Logging
+- Rate Limiting
+- Secure REST APIs
+
+---
+
+# 🎯 Future Enhancements
+
+- AI-assisted diagnosis
+- Telemedicine
+- Ambulance live tracking
+- Mobile application
+- Electronic Health Record integration
+- Multi-state healthcare federation
+- IoT medical device integration
+
+---
+
+# 👨‍💻 Developed For
+
+**Google Healthcare Hackathon**
+
+A centralized healthcare management platform focused on improving operational efficiency, resource utilization, and patient care through real-time digital coordination.
+
+---
+
+# 📄 License
+
+This project is developed for educational and hackathon purposes.
