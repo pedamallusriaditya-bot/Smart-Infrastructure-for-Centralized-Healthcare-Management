@@ -27,6 +27,7 @@
     "forceConsistentCasingInFileNames": true,
 
     "baseUrl": ".",
+    "ignoreDeprecations": "5.0",
 
     // Explicitly tell TS to look at standard Node types and your custom types
     "typeRoots": ["./node_modules/@types", "./types"],
